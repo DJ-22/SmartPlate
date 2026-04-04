@@ -1,7 +1,0 @@
-DROP DATABASE IF EXISTS SmartPlate;
-CREATE DATABASE SmartPlate;
-USE SmartPlate;
-
-ALTER DATABASE SmartPlate
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
