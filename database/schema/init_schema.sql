@@ -371,11 +371,16 @@ CREATE TABLE IF NOT EXISTS Sales_History (
     `sales_history_id` INT NOT NULL AUTO_INCREMENT,
     `quantity` DECIMAL(6,2) NOT NULL DEFAULT 0,
     `item_id` INT NOT NULL,
+    `menu_order_id` INT NOT NULL,
     `occasion_id` INT NOT NULL,
     PRIMARY KEY (`sales_history_id`),
     CONSTRAINT `fk_Sales_History_Items1`
         FOREIGN KEY (`item_id`)
-        REFERENCES Items(`item_id`)
+        REFERENCES Menu_Orders_Items(`item_id`)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT `fk_Sales_History_Menu_Orders1`
+        FOREIGN KEY (`menu_order_id`)
+        REFERENCES Menu_Orders_Items(`menu_order_id`)
         ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT `fk_Sales_History_Occasions1`
         FOREIGN KEY (`occasion_id`)
