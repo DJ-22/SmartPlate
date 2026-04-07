@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/database/triggers/trg_after_order_item_dispatched.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/database/triggers/trg_after_order_item_placed.sql" dialect="MySQL" />
+    <file url="PROJECT" dialect="MySQL" />
+  </component>
+</project>
