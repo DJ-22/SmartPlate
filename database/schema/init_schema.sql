@@ -2,11 +2,11 @@
 -- Auto-generated SQL DDL from ER_Diagram.mwb
 -- =================================================
 
-CREATE DATABASE IF NOT EXISTS mydb
+CREATE DATABASE IF NOT EXISTS SmartPlate
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_unicode_ci;
 
-USE mydb;
+USE SmartPlate;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
