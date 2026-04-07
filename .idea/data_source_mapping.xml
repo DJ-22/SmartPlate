@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/database/triggers/trg_after_order_item_dispatched.sql" value="0d99370b-1827-4ec3-a145-356753d5d9b0" />
+    <file url="file://$PROJECT_DIR$/database/triggers/trg_after_order_item_placed.sql" value="0d99370b-1827-4ec3-a145-356753d5d9b0" />
+  </component>
+</project>
