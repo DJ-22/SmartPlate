@@ -205,6 +205,10 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Item not found or not active';
     END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM Recipes WHERE item_id = p_item_id) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Item has no recipe and cannot be ordered';
+    END IF;
+
     START TRANSACTION;
     INSERT INTO Menu_Orders_Items (menu_order_id, item_id, quantity, status, prepared_at)
     VALUES (p_order_id, p_item_id, p_quantity, 0, NOW());

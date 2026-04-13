@@ -118,23 +118,28 @@ END$$
 
 -- =================================================
 -- TRIGGER 3: AFTER UPDATE ON Ingredients
--- quantity just crossed below min_stock + no pending
--- batch exists -> auto-order from fastest supplier
+-- Whenever quantity sits at/below min_stock and no
+-- pending batch exists -> auto-order from the supplier
+-- with the smallest delivery_time. The v_pending guard
+-- dedupes so repeated updates don't stack orders.
 -- =================================================
 CREATE TRIGGER trg_after_ingredient_update
 AFTER UPDATE ON Ingredients
 FOR EACH ROW
 BEGIN
-    DECLARE v_supplier_id INT;
-    DECLARE v_pending     INT;
+    DECLARE v_supplier_id    INT;
+    DECLARE v_pending        INT;
+    DECLARE v_price_per_unit DECIMAL(10,2);
+    DECLARE v_order_qty      DECIMAL(6,2);
 
-    IF NEW.quantity <= NEW.min_stock AND OLD.quantity > NEW.min_stock THEN
+    IF NEW.quantity <= NEW.min_stock THEN
         SELECT COUNT(*) INTO v_pending
         FROM Inventory_Batches
         WHERE ingredient_id = NEW.ingredient_id AND status IN (0, 1);
 
         IF v_pending = 0 THEN
-            SELECT s.supplier_id INTO v_supplier_id
+            SELECT s.supplier_id, sp.price_per_unit
+              INTO v_supplier_id, v_price_per_unit
             FROM Suppliers s
             INNER JOIN Supplies sp ON s.supplier_id = sp.supplier_id
             WHERE sp.ingredient_id = NEW.ingredient_id AND s.is_active = 1
@@ -143,9 +148,12 @@ BEGIN
             IF v_supplier_id IS NOT NULL THEN
                 -- Reorder enough to bring stock to ~2x min_stock so delivery
                 -- actually restocks the ingredient (see C1)
+                SET v_order_qty = GREATEST(NEW.min_stock * 2, 1);
                 INSERT INTO Inventory_Batches
                     (purchase_date, expiry_date, quantity, unit, cost, status, supplier_id, ingredient_id)
-                VALUES (NOW(), NULL, GREATEST(NEW.min_stock * 2, 1), NEW.unit, NULL, 0, v_supplier_id, NEW.ingredient_id);
+                VALUES (NOW(), NULL, v_order_qty, NEW.unit,
+                        v_order_qty * COALESCE(v_price_per_unit, 0),
+                        0, v_supplier_id, NEW.ingredient_id);
             END IF;
         END IF;
     END IF;
@@ -154,38 +162,115 @@ END$$
 
 -- =================================================
 -- TRIGGER 4: AFTER INSERT ON Ingredients
--- When a new ingredient is added with min_stock > 0,
--- immediately place an auto-order from the fastest
--- active supplier (quantity starts at 0 <= min_stock)
+-- If an active supplier exists and min_stock > 0,
+-- place an auto-order (quantity starts at 0 <= min_stock).
+-- If no supplier supplies it, alert managers so they
+-- can onboard one (paired with trg_after_supplies_insert)
 -- =================================================
 CREATE TRIGGER trg_after_ingredient_insert
 AFTER INSERT ON Ingredients
 FOR EACH ROW
 BEGIN
-    DECLARE v_supplier_id INT;
+    DECLARE v_supplier_id    INT DEFAULT NULL;
+    DECLARE v_alert_id       INT;
+    DECLARE v_price_per_unit DECIMAL(10,2);
+    DECLARE v_order_qty      DECIMAL(6,2);
 
-    IF NEW.min_stock > 0 THEN
-        SELECT s.supplier_id INTO v_supplier_id
-        FROM Suppliers s
-        INNER JOIN Supplies sp ON s.supplier_id = sp.supplier_id
-        WHERE sp.ingredient_id = NEW.ingredient_id AND s.is_active = 1
-        ORDER BY s.delivery_time ASC LIMIT 1;
+    SELECT s.supplier_id, sp.price_per_unit
+      INTO v_supplier_id, v_price_per_unit
+    FROM Suppliers s
+    INNER JOIN Supplies sp ON s.supplier_id = sp.supplier_id
+    WHERE sp.ingredient_id = NEW.ingredient_id AND s.is_active = 1
+    ORDER BY s.delivery_time ASC LIMIT 1;
 
-        IF v_supplier_id IS NOT NULL THEN
-            -- Reorder enough to bring stock to ~2x min_stock (see C1)
-            INSERT INTO Inventory_Batches
-                (purchase_date, expiry_date, quantity, unit, cost, status, supplier_id, ingredient_id)
-            VALUES (NOW(), NULL, GREATEST(NEW.min_stock * 2, 1), NEW.unit, NULL, 0, v_supplier_id, NEW.ingredient_id);
-        END IF;
+    IF v_supplier_id IS NULL THEN
+        INSERT INTO Alerts (message)
+        VALUES (LEFT(CONCAT('No supplier available for new ingredient: ', NEW.name), 150));
+        SET v_alert_id = LAST_INSERT_ID();
+
+        INSERT INTO Alerted (alert_id, user_id, created_at)
+        SELECT v_alert_id, u.user_id, NOW()
+        FROM Users u
+        INNER JOIN Roles r ON u.role_id = r.role_id
+        WHERE LOWER(r.name) = 'manager';
+    ELSEIF NEW.min_stock > 0 THEN
+        -- Reorder enough to bring stock to ~2x min_stock (see C1)
+        SET v_order_qty = GREATEST(NEW.min_stock * 2, 1);
+        INSERT INTO Inventory_Batches
+            (purchase_date, expiry_date, quantity, unit, cost, status, supplier_id, ingredient_id)
+        VALUES (NOW(), NULL, v_order_qty, NEW.unit,
+                v_order_qty * COALESCE(v_price_per_unit, 0),
+                0, v_supplier_id, NEW.ingredient_id);
     END IF;
 END$$
 
 
 -- =================================================
--- TRIGGER 5: AFTER UPDATE ON Menu_Orders_Items
+-- TRIGGER 4b: AFTER INSERT ON Supplies
+-- First supplier for an ingredient -> alert managers
+-- that a supplier has been found. Subsequent suppliers
+-- are a no-op (the "found" signal already fired).
+-- =================================================
+CREATE TRIGGER trg_after_supplies_insert
+AFTER INSERT ON Supplies
+FOR EACH ROW
+BEGIN
+    DECLARE v_supplier_count INT;
+    DECLARE v_alert_id       INT;
+    DECLARE v_ing_name       VARCHAR(100);
+    DECLARE v_sup_name       VARCHAR(100);
+
+    SELECT COUNT(*) INTO v_supplier_count
+    FROM Supplies
+    WHERE ingredient_id = NEW.ingredient_id;
+
+    IF v_supplier_count = 1 THEN
+        SELECT name INTO v_ing_name FROM Ingredients WHERE ingredient_id = NEW.ingredient_id;
+        SELECT name INTO v_sup_name FROM Suppliers  WHERE supplier_id  = NEW.supplier_id;
+
+        INSERT INTO Alerts (message)
+        VALUES (LEFT(CONCAT('Supplier found for ', v_ing_name, ': ', v_sup_name), 150));
+        SET v_alert_id = LAST_INSERT_ID();
+
+        INSERT INTO Alerted (alert_id, user_id, created_at)
+        SELECT v_alert_id, u.user_id, NOW()
+        FROM Users u
+        INNER JOIN Roles r ON u.role_id = r.role_id
+        WHERE LOWER(r.name) = 'manager';
+    END IF;
+END$$
+
+
+-- =================================================
+-- TRIGGER 5a: BEFORE UPDATE ON Menu_Orders_Items
+-- Guard: no backwards transitions allowed
+-- Stamp dispatched_at / delivered_at on the NEW row
+-- (must be done here — AFTER triggers cannot UPDATE
+-- the same table that invoked them, MySQL error 1442)
+-- =================================================
+CREATE TRIGGER trg_before_order_item_status
+BEFORE UPDATE ON Menu_Orders_Items
+FOR EACH ROW
+BEGIN
+    IF NEW.status < OLD.status THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Order item status cannot go backwards';
+    END IF;
+
+    IF OLD.status <> 1 AND NEW.status = 1 AND NEW.dispatched_at IS NULL THEN
+        SET NEW.dispatched_at = NOW();
+    END IF;
+
+    IF OLD.status <> 2 AND NEW.status = 2 AND NEW.delivered_at IS NULL THEN
+        SET NEW.delivered_at = NOW();
+    END IF;
+END$$
+
+
+-- =================================================
+-- TRIGGER 5b: AFTER UPDATE ON Menu_Orders_Items
 -- status 0->1: alert customer
 -- status 1->2: log to Sales_History
--- Guard: no backwards transitions allowed
 -- =================================================
 CREATE TRIGGER trg_after_order_item_status
 AFTER UPDATE ON Menu_Orders_Items
@@ -196,18 +281,8 @@ BEGIN
     DECLARE v_occ_id     INT;
     DECLARE v_order_date DATE;
 
-    -- Prevent backwards transitions at trigger level
-    IF NEW.status < OLD.status THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Order item status cannot go backwards';
-    END IF;
-
-    -- Out for delivery: alert customer + timestamp
+    -- Out for delivery: alert customer
     IF OLD.status <> 1 AND NEW.status = 1 THEN
-        UPDATE Menu_Orders_Items SET dispatched_at = NOW()
-        WHERE menu_order_id = NEW.menu_order_id AND item_id = NEW.item_id
-          AND dispatched_at IS NULL;
-
         SELECT user_id INTO v_user_id FROM Menu_Orders WHERE menu_order_id = NEW.menu_order_id;
         INSERT INTO Alerts (message)
         VALUES (CONCAT('Your order #', NEW.menu_order_id, ' is on the way!'));
@@ -215,12 +290,8 @@ BEGIN
         INSERT INTO Alerted (alert_id, user_id, created_at) VALUES (v_alert_id, v_user_id, NOW());
     END IF;
 
-    -- Delivered: log to Sales_History + timestamp
+    -- Delivered: log to Sales_History
     IF OLD.status <> 2 AND NEW.status = 2 THEN
-        UPDATE Menu_Orders_Items SET delivered_at = NOW()
-        WHERE menu_order_id = NEW.menu_order_id AND item_id = NEW.item_id
-          AND delivered_at IS NULL;
-
         SELECT DATE(order_time) INTO v_order_date
         FROM Menu_Orders WHERE menu_order_id = NEW.menu_order_id;
 
@@ -235,6 +306,35 @@ BEGIN
         INSERT INTO Sales_History (quantity, item_id, menu_order_id, occasion_id)
         VALUES (NEW.quantity, NEW.item_id, NEW.menu_order_id, v_occ_id);
     END IF;
+END$$
+
+
+-- =================================================
+-- TRIGGER 6: AFTER INSERT ON Gift_Code
+-- Announce the new code to every customer via the
+-- Alerts/Alerted fan-out used by /user/alerts
+-- =================================================
+CREATE TRIGGER trg_after_gift_code_insert
+AFTER INSERT ON Gift_Code
+FOR EACH ROW
+BEGIN
+    DECLARE v_alert_id INT;
+    DECLARE v_msg      VARCHAR(150);
+
+    -- Gift_Code.type: 0 = percent-based, 1 = flat amount
+    IF NEW.type = 0 THEN
+        SET v_msg = CONCAT('New gift code ', NEW.code, ': ',
+                           NEW.amount, '% off - valid until ', DATE(NEW.valid_to));
+    ELSE
+        SET v_msg = CONCAT('New gift code ', NEW.code, ': ',
+                           NEW.amount, ' off - valid until ', DATE(NEW.valid_to));
+    END IF;
+
+    INSERT INTO Alerts (message) VALUES (v_msg);
+    SET v_alert_id = LAST_INSERT_ID();
+
+    INSERT INTO Alerted (alert_id, user_id, created_at)
+    SELECT v_alert_id, c.user_id, NOW() FROM Customers c;
 END$$
 
 
