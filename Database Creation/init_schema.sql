@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS Permissions (
 CREATE TABLE IF NOT EXISTS Category (
     `category_id` INT NOT NULL AUTO_INCREMENT,
     `name`        VARCHAR(100) NOT NULL,
-    PRIMARY KEY (`category_id`)
+    PRIMARY KEY (`category_id`),
+    UNIQUE KEY `uk_category_name` (`name`)
 );
 
 CREATE TABLE IF NOT EXISTS Occasions (
