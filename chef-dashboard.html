@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartPlate — Chef</title>
+<style>
+  :root{
+    --bg:#0a0c12;--surface:#13161f;--surface2:#1a1d2a;--border:#252838;
+    --accent:#f0a060;--accent-glow:rgba(240,160,96,.2);
+    --text:#e8eaf0;--muted:#636880;--green:#56d18a;--red:#f07070;--yellow:#f0c060;--blue:#60a8f0;--purple:#a080f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  #auth-guard{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  #auth-guard p{color:var(--muted);font-size:14px}
+  #app{display:none}
+  /* layout */
+  .shell{display:flex;min-height:100vh}
+  aside{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+  .aside-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border)}
+  .aside-logo .icon{font-size:22px;margin-bottom:2px}
+  .aside-logo h1{font-size:15px;font-weight:700;color:var(--text)}
+  .aside-logo span{color:var(--accent)}
+  .aside-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+  .nav-section{padding:16px 16px 4px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-left:3px solid transparent;transition:.15s;user-select:none}
+  .nav-item .icon{font-size:15px;width:18px;text-align:center}
+  .nav-item:hover{color:var(--text);background:#ffffff06}
+  .nav-item.active{color:var(--text);background:#ffffff08;border-left-color:var(--accent)}
+  .aside-footer{margin-top:auto;padding:16px}
+  .aside-footer .user-pill{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--muted)}
+  .aside-footer .user-pill b{color:var(--text);display:block;font-size:13px;margin-bottom:1px}
+  .btn-signout{width:100%;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;transition:.2s}
+  .btn-signout:hover{border-color:var(--red);color:var(--red)}
+  main{flex:1;padding:28px 32px;overflow-y:auto}
+  /* panels */
+  .panel{display:none}.panel.active{display:block}
+  .page-header{margin-bottom:24px}
+  .page-header h2{font-size:20px;font-weight:700;margin-bottom:4px}
+  .page-header p{font-size:13px;color:var(--muted)}
+  /* cards */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .stat .val{font-size:30px;font-weight:700;margin-bottom:4px}
+  .stat .lbl{font-size:12px;color:var(--muted)}
+  /* orders grid */
+  .orders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .order-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;transition:.2s}
+  .order-card:hover{border-color:var(--accent)}
+  .order-card .oc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .order-card .oc-id{font-size:13px;font-weight:600;color:var(--accent)}
+  .order-card .oc-time{font-size:11px;color:var(--muted)}
+  .order-card .oc-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .order-card .oc-item:last-child{border-bottom:none}
+  .order-card .oc-name{flex:1}
+  .order-card .oc-qty{color:var(--muted);font-size:12px;margin:0 10px}
+  /* badges */
+  .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;gap:4px}
+  .b-prep{background:#2a1f10;color:var(--yellow)}
+  .b-out{background:#102030;color:var(--blue)}
+  .b-done{background:#0f2a1a;color:var(--green)}
+  /* buttons */
+  button{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+  .btn-primary{background:var(--accent);color:#111}
+  .btn-primary:hover{opacity:.85}
+  .btn-sec{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-green{background:var(--green);color:#111}
+  .btn-blue{background:var(--blue);color:#111}
+  /* alerts */
+  .alert-list{display:flex;flex-direction:column;gap:8px}
+  .alert-item{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px}
+  .alert-item .msg{font-size:13px}
+  .alert-item .time{font-size:11px;color:var(--muted);margin-top:3px}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{padding:10px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:12px}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .empty{text-align:center;color:var(--muted);padding:32px;font-size:13px}
+  /* refresh */
+  .toolbar{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+  .toolbar span{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="auth-guard"><p>Verifying session…</p></div>
+
+<div id="app">
+<div class="shell">
+  <aside>
+    <div class="aside-logo">
+      <div class="icon">👨‍🍳</div>
+      <h1>Smart<span>Plate</span></h1>
+      <p>Chef Dashboard</p>
+    </div>
+    <div class="nav-section">Kitchen</div>
+    <div class="nav-item active" onclick="show('orders')"><span class="icon">🧾</span>Active Orders</div>
+    <div class="nav-item" onclick="show('history')"><span class="icon">📋</span>All Orders</div>
+    <div class="nav-section">Alerts</div>
+    <div class="nav-item" onclick="show('alerts')"><span class="icon">🔔</span>Notifications <span id="alert-count" style="background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:auto"></span></div>
+    <div class="aside-footer">
+      <div class="user-pill"><b id="username-label">Chef</b>Kitchen Staff</div>
+      <button class="btn-signout" onclick="signout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ACTIVE ORDERS -->
+    <div id="panel-orders" class="panel active">
+      <div class="page-header">
+        <h2>Active Orders</h2>
+        <p>Orders currently being prepared or out for delivery</p>
+      </div>
+      <div class="stat-row" id="order-stats"></div>
+      <div class="toolbar">
+        <button class="btn-primary" onclick="loadOrders()">↻ Refresh</button>
+        <span id="last-refresh"></span>
+      </div>
+      <div id="orders-grid" class="orders-grid"></div>
+    </div>
+
+    <!-- ALL ORDERS HISTORY -->
+    <div id="panel-history" class="panel">
+      <div class="page-header">
+        <h2>Order History</h2>
+        <p>All orders — view and update status</p>
+      </div>
+      <table>
+        <thead><tr><th>Order #</th><th>Item</th><th>Qty</th><th>Status</th><th>Update</th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+
+    <!-- ALERTS -->
+    <div id="panel-alerts" class="panel">
+      <div class="page-header">
+        <h2>Notifications</h2>
+        <p>All alerts sent to your account</p>
+      </div>
+      <div id="alerts-list" class="alert-list"></div>
+    </div>
+  </main>
+</div>
+</div>
+
+<script>
+const API = (window.SMARTPLATE_API || 'http://localhost:8000') + '/api/v1';
+let token = '', username = '';
+
+function ah() { return { headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } }; }
+
+// Auth guard
+(function() {
+  token = sessionStorage.getItem('sp_token') || '';
+  const role = sessionStorage.getItem('sp_role') || '';
+  if (!token || role !== 'chef') { window.location.href = 'index.html'; return; }
+  document.getElementById('auth-guard').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadOrders();
+  loadAlerts();
+})();
+
+function signout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function show(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  const nav = Array.from(document.querySelectorAll('.nav-item'))
+    .find(n => (n.getAttribute('onclick') || '').includes(`'${name}'`));
+  if (nav) nav.classList.add('active');
+  if (name === 'orders') loadOrders();
+  if (name === 'history') loadHistory();
+  if (name === 'alerts') loadAlerts();
+}
+
+async function loadOrders() {
+  const res = await fetch(API + '/chef/orders/active', ah());
+  const items = (await res.json()) || [];
+
+  // Group by order_id
+  const grouped = {};
+  items.forEach(it => {
+    if (!grouped[it.order_id]) grouped[it.order_id] = [];
+    grouped[it.order_id].push(it);
+  });
+
+  const preparing = items.filter(i => i.status === 0).length;
+  const outForDelivery = items.filter(i => i.status === 1).length;
+  document.getElementById('order-stats').innerHTML = `
+    <div class="stat"><div class="val" style="color:var(--yellow)">${preparing}</div><div class="lbl">Preparing</div></div>
+    <div class="stat"><div class="val" style="color:var(--blue)">${outForDelivery}</div><div class="lbl">Out for Delivery</div></div>
+    <div class="stat"><div class="val" style="color:var(--accent)">${Object.keys(grouped).length}</div><div class="lbl">Active Orders</div></div>`;
+
+  document.getElementById('last-refresh').textContent = 'Last refreshed: ' + new Date().toLocaleTimeString();
+
+  const grid = document.getElementById('orders-grid');
+  if (!Object.keys(grouped).length) {
+    grid.innerHTML = '<div class="empty">🎉 No active orders right now</div>';
+    return;
+  }
+
+  grid.innerHTML = Object.entries(grouped).map(([orderId, its]) => {
+    const prepIds = its.filter(i=>i.status===0).map(i=>i.item_id).join(',');
+    const outIds  = its.filter(i=>i.status===1).map(i=>i.item_id).join(',');
+    return `
+    <div class="order-card">
+      <div class="oc-header">
+        <span class="oc-id">Order #${orderId}</span>
+        <span class="oc-time">${its.length} item${its.length > 1 ? 's' : ''}</span>
+      </div>
+      ${its.map(it => `
+        <div class="oc-item">
+          <span class="oc-name">${esc(it.item_name || 'Item #' + it.item_id)}</span>
+          <span class="oc-qty">x${it.quantity}</span>
+          <span class="badge ${it.status === 0 ? 'b-prep' : 'b-out'}">${it.status === 0 ? '🔥 Prep' : '🚗 Out'}</span>
+        </div>`).join('')}
+      <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+        ${prepIds ? `<button class="btn-blue" data-bulk="${orderId}" data-ids="${prepIds}" data-next="1">Mark Out for Delivery</button>` : ''}
+        ${outIds  ? `<button class="btn-green" data-bulk="${orderId}" data-ids="${outIds}" data-next="2">Mark Delivered</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('[data-bulk]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const orderId=parseInt(btn.dataset.bulk);
+      const ids=btn.dataset.ids.split(',').map(x=>parseInt(x)).filter(n=>!isNaN(n));
+      const next=parseInt(btn.dataset.next);
+      markAllStatus(orderId,ids,next);
+    });
+  });
+}
+
+async function markAllStatus(orderId, itemIds, status) {
+  const results = await Promise.all(itemIds.map(itemId =>
+    fetch(API + '/chef/orders/' + orderId + '/items/' + itemId + '/status', {
+      method: 'PATCH', ...ah(), body: JSON.stringify({ status })
+    }).then(async r => ({ ok: r.ok, detail: r.ok ? null : (await r.json().catch(()=>({}))).detail }))
+  ));
+  const failed = results.filter(r => !r.ok);
+  if (failed.length) alert(`${failed.length} update(s) failed: ` + failed.map(f => f.detail || 'error').join('; '));
+  loadOrders();
+}
+
+async function loadHistory() {
+  const res = await fetch(API + '/chef/orders', ah());
+  const items = (await res.json()) || [];
+  const statusLabel = ['Preparing', 'Out for Delivery', 'Delivered'];
+  const statusClass = ['b-prep', 'b-out', 'b-done'];
+  const body = document.getElementById('history-body');
+  if (!items.length) { body.innerHTML = '<tr><td colspan=5 class="empty">No orders</td></tr>'; return; }
+  body.innerHTML = items.map(it => `<tr>
+    <td>#${it.order_id}</td>
+    <td>${esc(it.item_name || 'Item #' + it.item_id)}</td>
+    <td>${it.quantity}</td>
+    <td><span class="badge ${statusClass[it.status]}">${statusLabel[it.status]}</span></td>
+    <td style="display:flex;gap:6px;flex-wrap:wrap">
+      ${it.status < 1 ? `<button class="btn-blue" onclick="updateStatus(${it.order_id},${it.item_id},1)">→ Out for Delivery</button>` : ''}
+      ${it.status < 2 ? `<button class="btn-green" onclick="updateStatus(${it.order_id},${it.item_id},2)">→ Delivered</button>` : ''}
+    </td>
+  </tr>`).join('');
+}
+
+async function updateStatus(orderId, itemId, status) {
+  await fetch(API + '/chef/orders/' + orderId + '/items/' + itemId + '/status', {
+    method: 'PATCH', ...ah(), body: JSON.stringify({ status })
+  });
+  loadOrders();
+  loadHistory();
+}
+
+async function loadAlerts() {
+  const res = await fetch(API + '/chef/alerts', ah());
+  const alerts = await res.json() || [];
+  const unread = alerts.filter(a => !a.read_at).length;
+  document.getElementById('alert-count').textContent = unread || '';
+  const list = document.getElementById('alerts-list');
+  if (!alerts.length) { list.innerHTML = '<div class="empty">No notifications</div>'; return; }
+  list.innerHTML = alerts.map(a => `
+    <div class="alert-item" data-alert="${a.alert_id}" style="opacity:${a.read_at?0.5:1}">
+      <div class="msg">${esc(a.message)}</div>
+      <div class="time">${esc(a.created_at || '')}</div>
+      ${a.read_at ? '' : `<button class="btn-secondary" data-mark="${a.alert_id}">Mark read</button>`}
+    </div>`).join('');
+  list.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', async e => {
+    const id = e.currentTarget.getAttribute('data-mark');
+    const r = await fetch(API + '/alerts/' + id + '/read', { method: 'PATCH', ...ah() });
+    if (r.ok) loadAlerts();
+  }));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartPlate — Customer</title>
+<style>
+  :root{
+    --bg:#0a0c12;--surface:#13161f;--surface2:#1a1d2a;--border:#252838;
+    --accent:#7c6ff7;--accent-glow:rgba(124,111,247,.2);
+    --text:#e8eaf0;--muted:#636880;--green:#56d18a;--red:#f07070;--yellow:#f0c060;--blue:#60a8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  #auth-guard{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  #auth-guard p{color:var(--muted);font-size:14px}
+  #app{display:none}
+  .shell{display:flex;min-height:100vh}
+  aside{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+  .aside-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border)}
+  .aside-logo .icon{font-size:22px;margin-bottom:2px}
+  .aside-logo h1{font-size:15px;font-weight:700}.aside-logo span{color:var(--accent)}
+  .aside-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+  .nav-section{padding:16px 16px 4px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-left:3px solid transparent;transition:.15s;user-select:none}
+  .nav-item .ni{font-size:15px;width:18px;text-align:center}
+  .nav-item:hover{color:var(--text);background:#ffffff06}
+  .nav-item.active{color:var(--text);background:#ffffff08;border-left-color:var(--accent)}
+  .aside-footer{margin-top:auto;padding:16px}
+  .user-pill{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+  .user-pill b{color:var(--text);display:block;font-size:13px;margin-bottom:1px}
+  .user-pill span{font-size:11px;color:var(--muted)}
+  .btn-signout{width:100%;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;transition:.2s}
+  .btn-signout:hover{border-color:var(--red);color:var(--red)}
+  main{flex:1;padding:28px 32px;overflow-y:auto}
+  .panel{display:none}.panel.active{display:block}
+  .page-header{margin-bottom:24px}
+  .page-header h2{font-size:20px;font-weight:700;margin-bottom:4px}
+  .page-header p{font-size:13px;color:var(--muted)}
+  .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:24px}
+  .menu-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;transition:.2s;cursor:default}
+  .menu-card:hover{border-color:var(--accent)}
+  .menu-card .cat{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .menu-card .name{font-size:15px;font-weight:600;margin-bottom:4px}
+  .menu-card .price{font-size:20px;font-weight:700;color:var(--accent);margin-bottom:6px}
+  .menu-card .desc{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+  .qty-row{display:flex;gap:8px;align-items:center}
+  .qty-row input{width:64px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;text-align:center;outline:none}
+  .qty-row input:focus{border-color:var(--accent)}
+  button{padding:8px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{opacity:.85}
+  .btn-sec{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-danger{background:var(--red);color:#fff}
+  .cart-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;position:sticky;top:24px}
+  .cart-box h3{font-size:13px;color:var(--muted);margin-bottom:12px;font-weight:500}
+  .cart-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .cart-total{font-size:17px;font-weight:700;color:var(--accent);margin-top:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{padding:10px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:12px}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+  .b0{background:#2a2010;color:var(--yellow)}
+  .b1{background:#102030;color:var(--blue)}
+  .b2{background:#0f2a1a;color:var(--green)}
+  .alert-item{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+  .alert-item .msg{font-size:13px}
+  .alert-item .time{font-size:11px;color:var(--muted);margin-top:3px}
+  .empty{text-align:center;color:var(--muted);padding:32px;font-size:13px}
+  .err{color:var(--red);font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<div id="auth-guard"><p>Verifying session…</p></div>
+<div id="app">
+<div class="shell">
+  <aside>
+    <div class="aside-logo">
+      <div class="icon">🍽</div>
+      <h1>Smart<span>Plate</span></h1>
+      <p>Customer Portal</p>
+    </div>
+    <div class="nav-section">Browse</div>
+    <div class="nav-item active" onclick="show('menu')"><span class="ni">🍕</span>Menu</div>
+    <div class="nav-section">My Account</div>
+    <div class="nav-item" onclick="show('orders')"><span class="ni">📦</span>My Orders</div>
+    <div class="nav-item" onclick="show('alerts')"><span class="ni">🔔</span>Notifications</div>
+    <div class="aside-footer">
+      <div class="user-pill"><b id="username-label">Customer</b><span>Customer Account</span></div>
+      <button class="btn-signout" onclick="signout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- MENU -->
+    <div id="panel-menu" class="panel active">
+      <div class="page-header">
+        <h2>Our Menu</h2>
+        <p>Click "Add" to add items to your current order</p>
+      </div>
+      <div style="display:flex;gap:20px;align-items:flex-start">
+        <div style="flex:1">
+          <div id="menu-grid" class="menu-grid"></div>
+        </div>
+        <div style="width:260px;flex-shrink:0">
+          <div class="cart-box">
+            <h3>ORDER <span id="order-id-label" style="color:var(--accent)"></span></h3>
+            <div id="cart-items"><p style="color:var(--muted);font-size:12px">No items yet</p></div>
+            <div class="cart-total" id="cart-total">$0.00</div>
+            <button class="btn-primary" style="width:100%;margin-top:12px" onclick="placeOrder()">Start New Order</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div id="panel-orders" class="panel">
+      <div class="page-header"><h2>My Orders</h2><p>Track your order history and status</p></div>
+      <table>
+        <thead><tr><th>Order #</th><th>Date</th><th>Total</th><th>Details</th></tr></thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </div>
+
+    <!-- ALERTS -->
+    <div id="panel-alerts" class="panel">
+      <div class="page-header"><h2>Notifications</h2><p>Delivery updates and alerts</p></div>
+      <div id="alerts-list"></div>
+    </div>
+  </main>
+</div>
+</div>
+
+<script>
+const API = (window.SMARTPLATE_API || 'http://localhost:8000') + '/api/v1';
+let token = '', currentOrderId = null, cart = [], cartTotal = 0;
+function ah(){ return {headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}} }
+
+(function(){
+  token = sessionStorage.getItem('sp_token') || '';
+  const role = sessionStorage.getItem('sp_role') || '';
+  if(!token || role !== 'customer'){ window.location.href='index.html'; return; }
+  document.getElementById('auth-guard').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadMenu(); loadAlerts();
+})();
+
+function signout(){ sessionStorage.clear(); window.location.href='index.html'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function show(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  const nav = Array.from(document.querySelectorAll('.nav-item'))
+    .find(n => (n.getAttribute('onclick')||'').includes(`'${name}'`));
+  if(nav) nav.classList.add('active');
+  if(name==='orders') loadOrders();
+  if(name==='alerts') loadAlerts();
+}
+
+async function loadMenu(){
+  const res=await fetch(API+'/user/menu',ah());
+  const items=(await res.json())||[];
+  document.getElementById('menu-grid').innerHTML=items.map(i=>`
+    <div class="menu-card">
+      <div class="cat">${esc(i.category_name||'')}</div>
+      <div class="name">${esc(i.name)}</div>
+      <div class="price">$${i.price.toFixed(2)}</div>
+      <div class="desc">${esc(i.description||'')}</div>
+      <div class="qty-row">
+        <input type="number" id="qty-${i.item_id}" value="1" min="1" max="99">
+        <button class="btn-primary" data-add="${i.item_id}" data-price="${i.price}">Add</button>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('#menu-grid [data-add]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id=parseInt(btn.dataset.add);
+      const item=items.find(x=>x.item_id===id);
+      if(item) addToOrder(item.item_id,item.name,item.price);
+    });
+  });
+}
+
+async function placeOrder(){
+  const res=await fetch(API+'/user/orders',{method:'POST',...ah(),body:'{}'});
+  const data=await res.json();
+  currentOrderId=data.order_id; cart=[]; cartTotal=0;
+  document.getElementById('order-id-label').textContent='#'+currentOrderId;
+  renderCart();
+}
+
+async function addToOrder(itemId,name,price){
+  const qty=parseFloat(document.getElementById('qty-'+itemId).value)||1;
+  // U3: defer order creation until first item is added
+  if(!currentOrderId){ await placeOrder(); }
+  if(!currentOrderId){ alert('Could not start a new order'); return; }
+  const res=await fetch(API+'/user/orders/'+currentOrderId+'/items',{method:'POST',...ah(),body:JSON.stringify({item_id:itemId,quantity:qty})});
+  if(!res.ok){ const d=await res.json(); alert(d.detail||'Error'); return; }
+  const existing=cart.find(c=>c.itemId===itemId);
+  if(existing){ existing.qty+=qty; } else { cart.push({itemId,name,price,qty}); }
+  cartTotal+=price*qty; renderCart();
+}
+
+function renderCart(){
+  const el=document.getElementById('cart-items');
+  el.innerHTML=cart.length?cart.map(c=>`<div class="cart-item"><span>${esc(c.name)} ×${c.qty}</span><span>$${(c.price*c.qty).toFixed(2)}</span></div>`).join(''):'<p style="color:var(--muted);font-size:12px">No items yet</p>';
+  document.getElementById('cart-total').textContent='$'+cartTotal.toFixed(2);
+}
+
+async function loadOrders(){
+  const res=await fetch(API+'/user/orders',ah());
+  const orders=(await res.json())||[];
+  const body=document.getElementById('orders-body');
+  if(!orders.length){body.innerHTML='<tr><td colspan=4 class="empty">No orders yet</td></tr>';return;}
+  body.innerHTML=orders.map(o=>`<tr>
+    <td style="font-weight:600">#${o.menu_order_id}</td>
+    <td>${new Date(o.order_time).toLocaleString()}</td>
+    <td style="color:var(--accent);font-weight:600">$${o.price.toFixed(2)}</td>
+    <td><button class="btn-sec" onclick="viewOrder(${o.menu_order_id})">View Items</button></td>
+  </tr>`).join('');
+}
+
+async function viewOrder(orderId){
+  const res=await fetch(API+'/user/orders/'+orderId,ah());
+  const data=await res.json();
+  const statusLabel=['Preparing','Out for Delivery','Delivered'];
+  const statusClass=['b0','b1','b2'];
+  const _items=data.items||[];const rows=_items.map(it=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #252838;font-size:13px;gap:8px">
+      <span style="flex:1">${esc(it.item_name||'Item #'+it.item_id)} ×${it.quantity}</span>
+      <span class="badge ${statusClass[it.status]||''}">${esc(statusLabel[it.status]||it.status)}</span>
+      ${it.status===0?`<button onclick="cancelItem(${orderId},${it.item_id},this)" style="padding:4px 10px;font-size:11px;background:#f07070;color:#fff;border:none;border-radius:6px;cursor:pointer">Cancel</button>`:''}
+    </div>`).join('');
+  const win=window.open('','_blank','width=480,height=500');
+  win.document.write(`<!DOCTYPE html><html><head><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',sans-serif;background:#0a0c12;color:#e8eaf0;padding:28px;min-height:100vh}.badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}.b0{background:#2a2010;color:#f0c060}.b1{background:#102030;color:#60a8f0}.b2{background:#0f2a1a;color:#56d18a}</style></head><body>
+    <h2 style="margin-bottom:20px;color:#7c6ff7;font-size:18px">Order #${orderId}</h2>${rows}
+    <p style="margin-top:16px;font-size:12px;color:#636880">$${data.order?.price?.toFixed(2)||'0.00'} total</p>
+  </body></html>`);
+  win.cancelItem=async function(oId,iId,btn){
+    const r=await fetch(API+'/user/orders/'+oId+'/items/'+iId,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});
+    if(r.ok){btn.closest('div').style.opacity='.4';btn.textContent='Cancelled';}
+    else{const d=await r.json();alert(d.detail||'Error');}
+  };
+}
+
+async function cancelItem(orderId,itemId){
+  const res=await fetch(API+'/user/orders/'+orderId+'/items/'+itemId,{method:'DELETE',...ah()});
+  if(res.ok) loadOrders(); else{const d=await res.json();alert(d.detail||'Error');}
+}
+
+async function loadAlerts(){
+  const res=await fetch(API+'/user/alerts',ah());
+  const alerts=await res.json()||[];
+  const list=document.getElementById('alerts-list');
+  if(!alerts.length){list.innerHTML='<div class="empty">No notifications yet</div>';return;}
+  list.innerHTML=alerts.map(a=>`<div class="alert-item" data-alert="${a.alert_id}" style="opacity:${a.read_at?0.5:1}"><div class="msg">${esc(a.message)}</div><div class="time">${esc(a.created_at||'')}</div>${a.read_at?'':'<button class="btn-secondary" data-mark="'+a.alert_id+'">Mark read</button>'}</div>`).join('');
+  list.querySelectorAll('[data-mark]').forEach(b=>b.addEventListener('click',async e=>{
+    const id=e.currentTarget.getAttribute('data-mark');
+    const r=await fetch(API+'/alerts/'+id+'/read',{method:'PATCH',...ah()});
+    if(r.ok){const row=e.currentTarget.closest('.alert-item');row.style.opacity=0.5;e.currentTarget.remove();}
+  }));
+}
+</script>
+</body>
+</html>

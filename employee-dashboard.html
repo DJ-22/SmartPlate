@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartPlate — Employee</title>
+<style>
+  :root{
+    --bg:#0a0c12;--surface:#13161f;--surface2:#1a1d2a;--border:#252838;
+    --accent:#60c8f0;--accent-glow:rgba(96,200,240,.2);
+    --text:#e8eaf0;--muted:#636880;--green:#56d18a;--red:#f07070;--yellow:#f0c060;--orange:#f0a060;--purple:#a080f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  #auth-guard{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  #auth-guard p{color:var(--muted);font-size:14px}
+  #app{display:none}
+  .shell{display:flex;min-height:100vh}
+  aside{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+  .aside-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border)}
+  .aside-logo .icon{font-size:22px;margin-bottom:2px}
+  .aside-logo h1{font-size:15px;font-weight:700;color:var(--text)}
+  .aside-logo span{color:var(--accent)}
+  .aside-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+  .nav-section{padding:16px 16px 4px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-left:3px solid transparent;transition:.15s;user-select:none}
+  .nav-item .icon{font-size:15px;width:18px;text-align:center}
+  .nav-item:hover{color:var(--text);background:#ffffff06}
+  .nav-item.active{color:var(--text);background:#ffffff08;border-left-color:var(--accent)}
+  .aside-footer{margin-top:auto;padding:16px}
+  .aside-footer .user-pill{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--muted)}
+  .aside-footer .user-pill b{color:var(--text);display:block;font-size:13px;margin-bottom:1px}
+  .btn-signout{width:100%;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;transition:.2s}
+  .btn-signout:hover{border-color:var(--red);color:var(--red)}
+  main{flex:1;padding:28px 32px;overflow-y:auto}
+  .panel{display:none}.panel.active{display:block}
+  .page-header{margin-bottom:24px}
+  .page-header h2{font-size:20px;font-weight:700;margin-bottom:4px}
+  .page-header p{font-size:13px;color:var(--muted)}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .stat .val{font-size:30px;font-weight:700;margin-bottom:4px}
+  .stat .lbl{font-size:12px;color:var(--muted)}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px}
+  .section h3{font-size:14px;font-weight:600;margin-bottom:14px;color:var(--text)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{padding:10px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:12px}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#ffffff03}
+  input,select{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;transition:.2s;margin-bottom:0}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+  button{padding:8px 16px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+  .btn-primary{background:var(--accent);color:#111}
+  .btn-primary:hover{opacity:.85}
+  .btn-sec{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+  .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+  .b0{background:#1f2a10;color:var(--yellow)}
+  .b1{background:#102040;color:var(--accent)}
+  .b2{background:#0f2a1a;color:var(--green)}
+  .ok{background:#0f2a1a;color:var(--green)}
+  .low{background:#2a1010;color:var(--red)}
+  .form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+  .form-row label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+  .empty{text-align:center;color:var(--muted);padding:32px;font-size:13px}
+  .supplier-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  .supplier-card .sname{font-size:13px;font-weight:600}
+  .supplier-card .smeta{font-size:12px;color:var(--muted);margin-top:2px}
+  .supplier-card .sprice{text-align:right}
+  .supplier-card .sprice .price{font-size:16px;font-weight:700;color:var(--accent)}
+  .supplier-card .sprice .unit{font-size:11px;color:var(--muted)}
+  .step{display:none}.step.active{display:block}
+  .step-indicator{display:flex;gap:8px;margin-bottom:20px}
+  .step-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:.2s}
+  .step-dot.active{background:var(--accent)}
+</style>
+</head>
+<body>
+
+<div id="auth-guard"><p>Verifying session…</p></div>
+
+<div id="app">
+<div class="shell">
+  <aside>
+    <div class="aside-logo">
+      <div class="icon">📦</div>
+      <h1>Smart<span>Plate</span></h1>
+      <p>Employee Dashboard</p>
+    </div>
+    <div class="nav-section">Inventory</div>
+    <div class="nav-item active" onclick="show('ingredients')"><span class="icon">🥬</span>Ingredients</div>
+    <div class="nav-item" onclick="show('order-batch')"><span class="icon">🛒</span>Order Batch</div>
+    <div class="nav-item" onclick="show('batches')"><span class="icon">📋</span>All Batches</div>
+    <div class="aside-footer">
+      <div class="user-pill"><b id="username-label">Employee</b>Staff</div>
+      <button class="btn-signout" onclick="signout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- INGREDIENTS -->
+    <div id="panel-ingredients" class="panel active">
+      <div class="page-header">
+        <h2>Ingredients Stock</h2>
+        <p>Current inventory levels — highlighted items need restocking</p>
+      </div>
+      <div class="stat-row" id="ing-stats"></div>
+      <table>
+        <thead><tr><th>Ingredient</th><th>Unit</th><th>Current Stock</th><th>Min Stock</th><th>Status</th></tr></thead>
+        <tbody id="ing-body"></tbody>
+      </table>
+    </div>
+
+    <!-- ORDER BATCH (step wizard) -->
+    <div id="panel-order-batch" class="panel">
+      <div class="page-header">
+        <h2>Order New Batch</h2>
+        <p>Select ingredient, choose supplier, confirm quantity</p>
+      </div>
+      <div class="section">
+        <div class="step-indicator">
+          <div class="step-dot active" id="dot-0"></div>
+          <div class="step-dot" id="dot-1"></div>
+          <div class="step-dot" id="dot-2"></div>
+        </div>
+
+        <!-- Step 1: Select ingredient -->
+        <div id="step-0" class="step active">
+          <h3 style="margin-bottom:12px">Step 1 — Select Ingredient</h3>
+          <div style="margin-bottom:14px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px">INGREDIENT</label>
+            <select id="sel-ingredient" style="max-width:300px" onchange="loadSuppliers()">
+              <option value="">— choose ingredient —</option>
+            </select>
+          </div>
+          <button class="btn-primary" onclick="goStep(1)" id="btn-step1" disabled>Next →</button>
+        </div>
+
+        <!-- Step 2: Choose supplier -->
+        <div id="step-1" class="step">
+          <h3 style="margin-bottom:12px">Step 2 — Choose Supplier</h3>
+          <div id="supplier-list"></div>
+          <button class="btn-sec" style="margin-top:10px" onclick="goStep(0)">← Back</button>
+        </div>
+
+        <!-- Step 3: Confirm quantity -->
+        <div id="step-2" class="step">
+          <h3 style="margin-bottom:12px">Step 3 — Confirm Order</h3>
+          <div id="order-summary" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;font-size:13px"></div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px">QUANTITY (<span id="qty-unit">units</span>)</label>
+            <input id="order-qty" type="number" step="0.01" min="0.01" placeholder="Enter quantity" style="max-width:200px">
+          </div>
+          <div id="cost-preview" style="font-size:13px;color:var(--muted);margin-bottom:14px"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-sec" onclick="goStep(1)">← Back</button>
+            <button class="btn-primary" onclick="confirmOrder()">Place Order</button>
+          </div>
+          <p id="order-result" style="margin-top:10px;font-size:13px"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL BATCHES -->
+    <div id="panel-batches" class="panel">
+      <div class="page-header">
+        <h2>All Batches</h2>
+        <p>Current inventory batches and their delivery status</p>
+      </div>
+      <div class="toolbar" style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn-primary" onclick="loadBatches()">↻ Refresh</button>
+      </div>
+      <table>
+        <thead><tr><th>Batch #</th><th>Ingredient</th><th>Supplier</th><th>Ordered</th><th>Expiry</th><th>Qty</th><th>Unit</th><th>Cost</th><th>Status</th></tr></thead>
+        <tbody id="batches-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</div>
+
+<script>
+const API = (window.SMARTPLATE_API || 'http://localhost:8000') + '/api/v1';
+let token = '';
+let selectedIngredient = null, selectedSupplier = null, allIngredients = [];
+
+function ah() { return { headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } }; }
+
+(function() {
+  token = sessionStorage.getItem('sp_token') || '';
+  const role = sessionStorage.getItem('sp_role') || '';
+  if (!token || role !== 'employee') { window.location.href = 'index.html'; return; }
+  document.getElementById('auth-guard').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadIngredients();
+})();
+
+function signout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function show(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  const nav = Array.from(document.querySelectorAll('.nav-item'))
+    .find(n => (n.getAttribute('onclick') || '').includes(`'${name}'`));
+  if (nav) nav.classList.add('active');
+  if (name === 'ingredients') loadIngredients();
+  if (name === 'order-batch') initOrderWizard();
+  if (name === 'batches') loadBatches();
+}
+
+async function loadIngredients() {
+  const res = await fetch(API + '/employee/ingredients', ah());
+  allIngredients = (await res.json()) || [];
+  const low = allIngredients.filter(i => i.quantity <= i.min_stock);
+  document.getElementById('ing-stats').innerHTML = `
+    <div class="stat"><div class="val" style="color:var(--accent)">${allIngredients.length}</div><div class="lbl">Total Ingredients</div></div>
+    <div class="stat"><div class="val" style="color:var(--red)">${low.length}</div><div class="lbl">Low Stock</div></div>
+    <div class="stat"><div class="val" style="color:var(--green)">${allIngredients.length - low.length}</div><div class="lbl">Well Stocked</div></div>`;
+  const body = document.getElementById('ing-body');
+  body.innerHTML = allIngredients.map(i => {
+    const isLow = i.quantity <= i.min_stock;
+    return `<tr>
+      <td style="font-weight:500">${esc(i.name)}</td>
+      <td>${esc(i.unit)}</td>
+      <td style="color:${isLow ? 'var(--red)' : 'var(--green)'};font-weight:600">${i.quantity}</td>
+      <td>${i.min_stock}</td>
+      <td><span class="badge ${isLow ? 'low' : 'ok'}">${isLow ? '⚠ Low' : '✓ OK'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function initOrderWizard() {
+  selectedIngredient = null; selectedSupplier = null;
+  goStep(0);
+  const sel = document.getElementById('sel-ingredient');
+  sel.innerHTML = '<option value="">— choose ingredient —</option>' +
+    allIngredients.map(i => `<option value="${i.ingredient_id}" data-unit="${esc(i.unit)}">${esc(i.name)} (${i.quantity} ${esc(i.unit)} in stock)</option>`).join('');
+  document.getElementById('btn-step1').disabled = true;
+}
+
+function goStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.step-dot').forEach(d => d.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+  document.getElementById('dot-' + n).classList.add('active');
+}
+
+async function loadSuppliers() {
+  const sel = document.getElementById('sel-ingredient');
+  const ingId = sel.value;
+  document.getElementById('btn-step1').disabled = !ingId;
+  if (!ingId) return;
+  selectedIngredient = { id: parseInt(ingId), name: sel.options[sel.selectedIndex].text, unit: sel.options[sel.selectedIndex].dataset.unit };
+
+  const res = await fetch(API + '/employee/ingredients/' + ingId + '/suppliers', ah());
+  const suppliers = await res.json() || [];
+  const list = document.getElementById('supplier-list');
+  if (!suppliers.length) { list.innerHTML = '<p style="color:var(--muted);font-size:13px">No active suppliers for this ingredient</p>'; return; }
+  list.innerHTML = suppliers.map(s => `
+    <div class="supplier-card" data-supplier="${s.supplier_id}" data-unit="${esc(s.unit)}" data-price="${s.price_per_unit}" data-delivery="${s.delivery_time}" id="sc-${s.supplier_id}" style="cursor:pointer">
+      <div>
+        <div class="sname">Supplier #${s.supplier_id}</div>
+        <div class="smeta">Delivery: ${s.delivery_time} day${s.delivery_time !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="sprice">
+        <div class="price">$${parseFloat(s.price_per_unit).toFixed(2)}</div>
+        <div class="unit">per ${esc(s.unit)}</div>
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('[data-supplier]').forEach(card=>{
+    card.addEventListener('click',()=>{
+      selectSupplier(
+        parseInt(card.dataset.supplier),
+        card.dataset.unit,
+        parseFloat(card.dataset.price),
+        parseInt(card.dataset.delivery)
+      );
+    });
+  });
+}
+
+function selectSupplier(id, unit, price, deliveryTime) {
+  document.querySelectorAll('.supplier-card').forEach(c => c.style.borderColor = '');
+  const el = document.getElementById('sc-' + id);
+  if (el) el.style.borderColor = 'var(--accent)';
+  selectedSupplier = { id, unit, price, deliveryTime };
+
+  // Build step 3 summary
+  document.getElementById('order-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><div style="color:var(--muted);font-size:11px;margin-bottom:2px">INGREDIENT</div><div style="font-weight:600">${esc(selectedIngredient.name)}</div></div>
+      <div><div style="color:var(--muted);font-size:11px;margin-bottom:2px">SUPPLIER</div><div style="font-weight:600">#${id}</div></div>
+      <div><div style="color:var(--muted);font-size:11px;margin-bottom:2px">PRICE/UNIT</div><div style="font-weight:600;color:var(--accent)">$${price.toFixed(2)} / ${esc(unit)}</div></div>
+      <div><div style="color:var(--muted);font-size:11px;margin-bottom:2px">ETA</div><div style="font-weight:600">${deliveryTime} day${deliveryTime !== 1 ? 's' : ''}</div></div>
+    </div>`;
+  document.getElementById('qty-unit').textContent = unit;
+
+  const qtyInput = document.getElementById('order-qty');
+  qtyInput.oninput = function() {
+    const qty = parseFloat(this.value) || 0;
+    const cost = qty * price;
+    document.getElementById('cost-preview').textContent = qty > 0 ? `Estimated cost: $${cost.toFixed(2)}` : '';
+  };
+
+  goStep(2);
+}
+
+async function confirmOrder() {
+  const qty = parseFloat(document.getElementById('order-qty').value);
+  if (!qty || qty <= 0) { document.getElementById('order-result').textContent = 'Please enter a valid quantity'; return; }
+  const res = await fetch(API + '/employee/batches', {
+    method: 'POST', ...ah(),
+    body: JSON.stringify({ ingredient_id: selectedIngredient.id, supplier_id: selectedSupplier.id, quantity: qty })
+  });
+  const result = document.getElementById('order-result');
+  if (res.ok) {
+    result.style.color = 'var(--green)';
+    result.textContent = `✓ Order placed! ${qty} ${selectedSupplier.unit} of ${selectedIngredient.name} ordered from supplier #${selectedSupplier.id}.`;
+    setTimeout(() => initOrderWizard(), 3000);
+  } else {
+    const d = await res.json();
+    result.style.color = 'var(--red)';
+    result.textContent = d.detail || 'Order failed';
+  }
+}
+
+async function loadBatches() {
+  const res = await fetch(API + '/employee/batches', ah());
+  const batches = await res.json() || [];
+  const statusLabel = ['Ordered', 'Shipped', 'Delivered'];
+  const body = document.getElementById('batches-body');
+  if (!batches.length) { body.innerHTML = '<tr><td colspan=9 class="empty">No batches</td></tr>'; return; }
+  body.innerHTML = batches.map(b => `<tr>
+    <td>#${b.batch_id}</td>
+    <td>${esc(b.ingredient_name || b.ingredient_id)}</td>
+    <td>${esc(b.supplier_name || '#' + b.supplier_id)}</td>
+    <td>${new Date(b.purchase_date).toLocaleDateString()}</td>
+    <td>${b.expiry_date ? new Date(b.expiry_date).toLocaleDateString() : '—'}</td>
+    <td>${b.quantity}</td>
+    <td>${esc(b.unit || '—')}</td>
+    <td>${b.cost != null ? '$' + parseFloat(b.cost).toFixed(2) : '—'}</td>
+    <td><span class="badge b${b.status}">${statusLabel[b.status]}</span></td>
+  </tr>`).join('');
+}
+</script>
+</body>
+</html>

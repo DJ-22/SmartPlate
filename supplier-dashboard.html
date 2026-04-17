@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartPlate — Supplier</title>
+<style>
+  :root{--bg:#0a0c12;--surface:#13161f;--surface2:#1a1d2a;--border:#252838;--accent:#f0a060;--accent-glow:rgba(240,160,96,.2);--text:#e8eaf0;--muted:#636880;--green:#56d18a;--red:#f07070;--blue:#60a8f0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh}
+  #auth{display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .auth-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:360px}
+  .auth-box h1{font-size:22px;margin-bottom:8px;color:var(--accent)}
+  .auth-box p{color:var(--muted);font-size:13px;margin-bottom:24px}
+  input,select{width:100%;padding:10px 14px;background:#0f1117;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;margin-bottom:12px;outline:none}
+  input:focus{border-color:var(--accent)}
+  button{padding:9px 16px;background:var(--accent);color:#111;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+  button:hover{opacity:.85}
+  button.sec{background:transparent;border:1px solid var(--border);color:var(--text)}
+  button.danger{background:var(--red);color:#fff}
+  button.full{width:100%}
+  #app{display:none;max-width:1100px;margin:0 auto;padding:24px}
+  nav{display:flex;align-items:center;gap:10px;margin-bottom:28px;flex-wrap:wrap}
+  nav h1{font-size:20px;color:var(--accent);margin-right:auto}
+  .tab{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;cursor:pointer}
+  .tab.active,.tab:hover{background:var(--accent);color:#111;border-color:var(--accent)}
+  .panel{display:none}.panel.active{display:block}
+  h2{font-size:17px;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:var(--surface);padding:10px 12px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+  .s0{background:#2d3748;color:#ecc94b}
+  .s1{background:#2d3748;color:#63b3ed}
+  .s2{background:#2d3748;color:#48bb78}
+  .form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+  .form-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  .form-row input,.form-row select{margin-bottom:0;width:auto}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
+  .err{color:var(--red);font-size:13px;margin-top:6px}
+  .editable{background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text);font-size:13px;padding:3px 6px;width:100px}
+  .editable:focus{border-color:var(--accent);background:#0f1117;outline:none}
+</style>
+</head>
+<body>
+
+<div id="auth-guard" style="position:fixed;inset:0;background:#0a0c12;display:flex;align-items:center;justify-content:center;z-index:100"><p style="color:#636880;font-size:14px">Verifying session…</p></div>
+
+<div id="app">
+  <nav>
+    <h1>📦 Supplier Portal</h1>
+    <button class="tab active" onclick="showPanel('batches')">Batches</button>
+    <button class="tab" onclick="showPanel('supplies')">My Supplies</button>
+    <button class="tab" onclick="showPanel('profile')">Profile</button>
+    <button class="sec tab" onclick="logout()">Sign Out</button>
+  </nav>
+
+  <!-- BATCHES -->
+  <div id="panel-batches" class="panel active">
+    <h2>Incoming Batches</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">You can update the expiry date and status for your batches.</p>
+    <table>
+      <thead><tr><th>Batch #</th><th>Ingredient</th><th>Ordered</th><th>Qty</th><th>Unit</th><th>Cost</th><th>Status</th><th>Expiry Date</th><th>Save</th></tr></thead>
+      <tbody id="batches-body"></tbody>
+    </table>
+  </div>
+
+  <!-- SUPPLIES -->
+  <div id="panel-supplies" class="panel">
+    <h2>My Supplies</h2>
+    <div class="section">
+      <h3 style="font-size:14px;margin-bottom:12px;color:var(--muted)">Add New Supply</h3>
+      <div class="form-row">
+        <div><label>Ingredient</label><select id="new-ing" style="width:180px"></select></div>
+        <div><label>Price/Unit</label><input id="new-price" type="number" step="0.01" placeholder="0.00" style="width:110px"></div>
+        <div><label>Unit</label><input id="new-unit" placeholder="kg" style="width:80px"></div>
+        <div style="align-self:flex-end"><button onclick="addSupply()">Add</button></div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Ingredient</th><th>Price/Unit</th><th>Unit</th><th>Actions</th></tr></thead>
+      <tbody id="supplies-body"></tbody>
+    </table>
+  </div>
+
+  <!-- PROFILE -->
+  <div id="panel-profile" class="panel">
+    <h2>My Profile</h2>
+    <div class="section" style="max-width:400px">
+      <div style="margin-bottom:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Contact Email</label>
+        <input id="prof-contact" placeholder="contact@supplier.com"></div>
+      <div style="margin-bottom:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Delivery Time (days)</label>
+        <input id="prof-delivery" type="number" min="1"></div>
+      <button onclick="saveProfile()">Save Changes</button>
+      <p id="prof-msg" class="err" style="color:var(--green);margin-top:8px"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = (window.SMARTPLATE_API || 'http://localhost:8000') + '/api/v1';
+let token='', supplierId=0;
+function ah(){ return {headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}} }
+
+(function(){
+  token=sessionStorage.getItem('sp_token')||'';
+  const role=sessionStorage.getItem('sp_role')||'';
+  supplierId=parseInt(sessionStorage.getItem('sp_supplier_id')||'0');
+  if(!token||role!=='supplier'){ window.location.href='index.html'; return; }
+  document.getElementById('auth-guard').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadBatches(); loadSupplies(); loadAllIngredients();
+})();
+
+function logout(){ sessionStorage.clear(); window.location.href='index.html'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showPanel(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  const tab = Array.from(document.querySelectorAll('.tab'))
+    .find(t => (t.getAttribute('onclick')||'').includes(`'${name}'`));
+  if(tab) tab.classList.add('active');
+  if(name==='batches') loadBatches();
+  if(name==='supplies'){ loadSupplies(); loadAllIngredients(); }
+}
+
+async function loadBatches(){
+  const res=await fetch(API+'/supplier/batches',ah());
+  const batches=(await res.json())||[];
+  const statusLabel=['Ordered','Shipped','Delivered'];
+  const body=document.getElementById('batches-body');
+  if(!batches||!batches.length){ body.innerHTML='<tr><td colspan=9 style="color:var(--muted);text-align:center">No batches</td></tr>'; return; }
+  body.innerHTML=batches.map(b=>`<tr>
+    <td>#${b.batch_id}</td>
+    <td>${esc(b.ingredient_name||b.ingredient_id)}</td>
+    <td>${new Date(b.purchase_date).toLocaleDateString()}</td>
+    <td>${b.quantity}</td>
+    <td>${esc(b.unit||'—')}</td>
+    <td>${b.cost!=null?'$'+parseFloat(b.cost).toFixed(2):'—'}</td>
+    <td><span class="badge s${b.status}">${statusLabel[b.status]}</span></td>
+    <td><input class="editable" id="exp-${b.batch_id}" type="date" value="${b.expiry_date?b.expiry_date.substring(0,10):''}"></td>
+    <td>
+      <select id="st-${b.batch_id}" style="width:100px;margin:0">
+        <option value="0" ${b.status===0?'selected':''}>Ordered</option>
+        <option value="1" ${b.status===1?'selected':''}>Shipped</option>
+        <option value="2" ${b.status===2?'selected':''}>Delivered</option>
+      </select>
+      <button style="margin-top:4px" onclick="saveBatch(${b.batch_id})">Save</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function saveBatch(id){
+  const exp=document.getElementById('exp-'+id).value;
+  const st=parseInt(document.getElementById('st-'+id).value);
+  const body={status:st};
+  if(exp) body.expiry_date=exp;
+  const res=await fetch(API+'/supplier/batches/'+id,{method:'PATCH',...ah(),body:JSON.stringify(body)});
+  if(res.ok){ loadBatches(); } else { const d=await res.json(); alert(d.detail||'Error'); }
+}
+
+async function loadSupplies(){
+  const res=await fetch(API+'/supplier/supplies',ah());
+  const supplies=(await res.json())||[];
+  const body=document.getElementById('supplies-body');
+  if(!supplies||!supplies.length){ body.innerHTML='<tr><td colspan=4 style="color:var(--muted);text-align:center">No supplies listed</td></tr>'; return; }
+  body.innerHTML=supplies.map(s=>`<tr>
+    <td>${esc(s.ingredient_name||s.ingredient_id)}</td>
+    <td><input class="editable" id="p-${s.ingredient_id}" type="number" step="0.01" value="${s.price_per_unit}"></td>
+    <td><input class="editable" id="u-${s.ingredient_id}" value="${esc(s.unit)}"></td>
+    <td>
+      <button onclick="updatePricing(${s.ingredient_id})">Update</button>
+      <button class="danger" style="margin-left:6px" onclick="removeSupply(${s.ingredient_id})">Remove</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function updatePricing(ingId){
+  const price=parseFloat(document.getElementById('p-'+ingId).value);
+  const unit=document.getElementById('u-'+ingId).value;
+  const res=await fetch(API+'/supplier/supplies/'+ingId+'/pricing',{method:'PATCH',...ah(),body:JSON.stringify({price_per_unit:price,unit})});
+  if(res.ok) loadSupplies(); else { const d=await res.json(); alert(d.detail||'Error'); }
+}
+
+async function removeSupply(ingId){
+  if(!confirm('Remove this supply?')) return;
+  await fetch(API+'/supplier/supplies/'+ingId,{method:'DELETE',...ah()});
+  loadSupplies();
+}
+
+async function loadAllIngredients(){
+  const res=await fetch(API+'/employee/ingredients',ah());
+  const ings=(await res.json())||[];
+  const sel=document.getElementById('new-ing');
+  sel.innerHTML=ings.map(i=>`<option value="${i.ingredient_id}">${esc(i.name)}</option>`).join('');
+}
+
+async function addSupply(){
+  const ingId=parseInt(document.getElementById('new-ing').value);
+  const price=parseFloat(document.getElementById('new-price').value)||0;
+  const unit=document.getElementById('new-unit').value||'kg';
+  const res=await fetch(API+'/supplier/supplies',{method:'POST',...ah(),body:JSON.stringify({ingredient_id:ingId,price_per_unit:price,unit})});
+  if(res.ok) loadSupplies(); else { const d=await res.json(); alert(d.detail||'Error'); }
+}
+
+async function saveProfile(){
+  const contact=document.getElementById('prof-contact').value;
+  const delivery=parseInt(document.getElementById('prof-delivery').value);
+  const body={};
+  if(contact) body.contact=contact;
+  if(delivery) body.delivery_time=delivery;
+  const res=await fetch(API+'/supplier/profile',{method:'PATCH',...ah(),body:JSON.stringify(body)});
+  const msg=document.getElementById('prof-msg');
+  if(res.ok){ msg.textContent='Saved!'; msg.style.color='var(--green)'; }
+  else { const d=await res.json(); msg.textContent=d.detail||'Error'; msg.style.color='var(--red)'; }
+}
+</script>
+</body>
+</html>

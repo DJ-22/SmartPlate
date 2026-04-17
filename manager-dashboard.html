@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartPlate — Manager</title>
+<style>
+  :root{--bg:#0a0c12;--surface:#13161f;--surface2:#1a1d2a;--border:#252838;--accent:#56d18a;--accent2:#60a8f0;--text:#e8eaf0;--muted:#636880;--red:#f07070;--yellow:#f0c060;--purple:#a080f0;--orange:#f0a060}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  #auth-guard{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  #auth-guard p{color:var(--muted);font-size:14px}
+  #app{display:none;min-height:100vh}
+  #app.ready{display:flex}
+  aside{width:210px;background:var(--surface);border-right:1px solid var(--border);padding:0;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .aside-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
+  .aside-logo h1{font-size:15px;font-weight:700;color:var(--text)}.aside-logo span{color:var(--accent)}
+  .aside-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+  .nav-section{padding:14px 16px 4px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .nav-item{padding:9px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-left:3px solid transparent;transition:.15s;user-select:none}
+  .nav-item:hover{color:var(--text);background:#ffffff06}
+  .nav-item.active{color:var(--text);background:#ffffff08;border-left-color:var(--accent)}
+  .aside-footer{margin-top:auto;padding:14px}
+  button.signout{width:100%;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;transition:.2s}
+  button.signout:hover{border-color:var(--red);color:var(--red)}
+  main{flex:1;padding:28px 32px;overflow-y:auto}
+  .panel{display:none}.panel.active{display:block}
+  h2{font-size:19px;font-weight:700;margin-bottom:20px}
+  /* inputs */
+  input,select,textarea{padding:8px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;outline:none;transition:.15s}
+  input:focus,select:focus{border-color:var(--accent)}
+  /* buttons */
+  button{padding:8px 14px;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+  .btn-g{background:var(--accent);color:#111}.btn-g:hover{opacity:.85}
+  .btn-b{background:var(--accent2);color:#111}.btn-b:hover{opacity:.85}
+  .btn-r{background:var(--red);color:#fff}.btn-r:hover{opacity:.85}
+  .btn-o{background:var(--orange);color:#111}.btn-o:hover{opacity:.85}
+  .btn-s{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-s:hover{border-color:var(--accent);color:var(--accent)}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{padding:9px 11px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface)}
+  td{padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:hover td{background:#ffffff03}
+  tr:last-child td{border-bottom:none}
+  /* section card */
+  .sc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px}
+  .sc h3{font-size:13px;color:var(--muted);margin-bottom:14px;font-weight:500}
+  /* form grid */
+  .fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-bottom:12px}
+  .fg label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+  .fg input,.fg select{width:100%;margin:0}
+  /* badges */
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+  .bY{background:#2a1f10;color:var(--yellow)}
+  .bB{background:#102030;color:var(--accent2)}
+  .bG{background:#0f2a1a;color:var(--accent)}
+  .bR{background:#2a1010;color:var(--red)}
+  .bP{background:#1a1030;color:var(--purple)}
+  /* editable inline */
+  .ed{background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text);font-size:12px;padding:3px 5px;width:100%}
+  .ed:focus{border-color:var(--accent);background:var(--surface2);outline:none}
+  select.ed{background:transparent}
+  select.ed:focus{background:var(--surface2)}
+  /* stats */
+  .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .stat .val{font-size:28px;font-weight:700;color:var(--accent);margin-bottom:4px}
+  .stat .lbl{font-size:12px;color:var(--muted)}
+  .actions{display:flex;gap:5px;flex-wrap:wrap}
+  .toolbar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+  .toolbar input{width:220px}
+  .empty{text-align:center;color:var(--muted);padding:28px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="auth-guard"><p>Verifying session…</p></div>
+<div id="app">
+
+  <aside>
+    <div class="aside-logo"><h1>⚙ Smart<span>Plate</span></h1><p>Manager Dashboard</p></div>
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="show('overview')">Dashboard</div>
+    <div class="nav-section">Menu</div>
+    <div class="nav-item" onclick="show('menu')">Menu Items</div>
+    <div class="nav-item" onclick="show('categories')">Categories</div>
+    <div class="nav-section">Inventory</div>
+    <div class="nav-item" onclick="show('ingredients')">Ingredients</div>
+    <div class="nav-item" onclick="show('batches')">Batches</div>
+    <div class="nav-item" onclick="show('waste')">Waste Records</div>
+    <div class="nav-section">People</div>
+    <div class="nav-item" onclick="show('suppliers')">Suppliers</div>
+    <div class="nav-item" onclick="show('users')">Users</div>
+    <div class="nav-section">Data</div>
+    <div class="nav-item" onclick="show('orders')">Orders</div>
+    <div class="nav-item" onclick="show('sales')">Sales History</div>
+    <div class="nav-item" onclick="show('logs')">Logs</div>
+    <div class="nav-item" onclick="show('compliance')">Compliance</div>
+    <div class="nav-item" onclick="show('giftcodes')">Gift Codes</div>
+    <div class="nav-section">Forecasting</div>
+    <div class="nav-item" onclick="show('forecast')">Forecast</div>
+    <div class="aside-footer"><button class="signout" onclick="logout()">Sign Out</button></div>
+  </aside>
+
+  <main>
+
+    <!-- OVERVIEW -->
+    <div id="panel-overview" class="panel active">
+      <h2>Dashboard</h2>
+      <div class="sg" id="stats"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="sc"><h3>Recent Orders</h3><div id="recent-orders"></div></div>
+        <div class="sc"><h3>Low Stock Ingredients</h3><div id="low-stock"></div></div>
+      </div>
+    </div>
+
+    <!-- MENU -->
+    <div id="panel-menu" class="panel">
+      <h2>Menu Items</h2>
+      <div class="sc"><h3>Add Item</h3>
+        <div class="fg">
+          <div><label>Name</label><input id="mi-name"></div>
+          <div><label>Description</label><input id="mi-desc"></div>
+          <div><label>Price ($)</label><input id="mi-price" type="number" step="0.01" min="0"></div>
+          <div><label>Prep Time (min)</label><input id="mi-prep" type="number" min="0"></div>
+          <div><label>Category</label><input id="mi-cat"></div>
+        </div>
+        <button class="btn-g" onclick="addMenuItem()">Add Item</button>
+      </div>
+      <div class="toolbar"><input id="menu-search" placeholder="Search items…" oninput="filterMenu()"></div>
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Category</th><th>Price</th><th>Prep (min)</th><th>Available</th><th>Actions</th></tr></thead>
+        <tbody id="menu-body"></tbody>
+      </table>
+    </div>
+
+    <!-- INGREDIENTS -->
+    <div id="panel-ingredients" class="panel">
+      <h2>Ingredients</h2>
+      <div class="sc"><h3>Add Ingredient</h3>
+        <div class="fg">
+          <div><label>Name</label><input id="ing-name"></div>
+          <div><label>Unit</label>
+            <select id="ing-unit"><option>kg</option><option>g</option><option>litre</option><option>ml</option><option>units</option><option>tbsp</option><option>tsp</option></select>
+          </div>
+          <div><label>Min Stock</label><input id="ing-min" type="number" step="0.01" min="0"></div>
+          <div><label>Allergen</label>
+            <select id="ing-allergen-sel"><option value="None">None</option></select>
+          </div>
+        </div>
+        <button class="btn-g" onclick="addIngredient()">Add</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Unit</th><th>Min Stock</th><th>Current Stock</th><th>Allergen</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="ing-body"></tbody>
+      </table>
+    </div>
+
+    <!-- BATCHES -->
+    <div id="panel-batches" class="panel">
+      <h2>Inventory Batches</h2>
+      <table>
+        <thead><tr><th>#</th><th>Ingredient</th><th>Supplier</th><th>Ordered</th><th>Expiry</th><th>Qty</th><th>Unit</th><th>Cost ($)</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="batches-body"></tbody>
+      </table>
+    </div>
+
+    <!-- WASTE -->
+    <div id="panel-waste" class="panel">
+      <h2>Waste Records</h2>
+      <div class="sc"><h3>Log Waste</h3>
+        <div class="fg">
+          <div><label>Batch</label><select id="w-batch-sel" style="width:100%"><option value="">— select batch —</option></select></div>
+          <div><label>Quantity</label><input id="w-qty" type="number" step="0.01" min="0.01"></div>
+        </div>
+        <p id="w-batch-info" style="font-size:12px;color:var(--muted);margin-bottom:10px"></p>
+        <button class="btn-r" onclick="logWaste()">Log Waste</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Batch #</th><th>Ingredient</th><th>Quantity</th><th>Timestamp</th></tr></thead>
+        <tbody id="waste-body"></tbody>
+      </table>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div id="panel-suppliers" class="panel">
+      <h2>Suppliers</h2>
+      <div class="sc"><h3>Add Supplier (creates linked user account)</h3>
+        <div class="fg">
+          <div><label>Company Name</label><input id="sup-name"></div>
+          <div><label>Contact Email</label><input id="sup-contact" type="email"></div>
+          <div><label>Delivery Time (days)</label><input id="sup-dt" type="number" min="1" value="2"></div>
+          <div><label>Login Username</label><input id="sup-username"></div>
+          <div><label>Login Password</label><input id="sup-password" type="password"></div>
+        </div>
+        <button class="btn-g" onclick="addSupplierWithUser()">Add Supplier + Create Account</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Contact</th><th>Delivery (days)</th><th>Active</th><th>User ID</th><th>Actions</th></tr></thead>
+        <tbody id="sup-body"></tbody>
+      </table>
+    </div>
+
+    <!-- USERS -->
+    <div id="panel-users" class="panel">
+      <h2>Users</h2>
+      <div class="sc"><h3>Add User</h3>
+        <div class="fg">
+          <div><label>Username</label><input id="u-username"></div>
+          <div><label>Email</label><input id="u-email" type="email"></div>
+          <div><label>Password</label><input id="u-password" type="password"></div>
+          <div><label>Role</label>
+            <select id="u-role">
+              <option value="customer">Customer</option>
+              <option value="chef">Chef</option>
+              <option value="employee">Employee</option>
+              <option value="supplier">Supplier</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+          <div><label>Display Name</label><input id="u-name"></div>
+          <div><label>Salary (staff only)</label><input id="u-salary" type="number" step="0.01" value="0"></div>
+        </div>
+        <div id="u-supplier-fields" style="display:none">
+          <div class="fg">
+            <div><label>Company Contact</label><input id="u-contact"></div>
+            <div><label>Delivery Time (days)</label><input id="u-dt" type="number" min="1" value="2"></div>
+          </div>
+        </div>
+        <button class="btn-g" onclick="createUser()">Create User</button>
+        <p id="u-result" style="font-size:12px;margin-top:8px"></p>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Username</th><th>Email</th><th>Role</th><th>Last Login</th><th>Actions</th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+
+    <!-- ORDERS -->
+    <div id="panel-orders" class="panel">
+      <h2>All Orders</h2>
+      <div class="form-row" style="margin-bottom:12px;gap:8px">
+        <label>From <input type="date" id="orders-from"></label>
+        <label>To <input type="date" id="orders-to"></label>
+        <button class="btn-secondary" onclick="loadOrders()">Apply</button>
+        <button class="btn-secondary" onclick="document.getElementById('orders-from').value='';document.getElementById('orders-to').value='';loadOrders()">Clear</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>User ID</th><th>Time</th><th>Total</th><th>Items</th></tr></thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </div>
+
+    <!-- SALES -->
+    <div id="panel-sales" class="panel">
+      <h2>Sales History</h2>
+      <div class="form-row" style="margin-bottom:12px;gap:8px">
+        <label>From <input type="date" id="sales-from"></label>
+        <label>To <input type="date" id="sales-to"></label>
+        <button class="btn-secondary" onclick="loadSales()">Apply</button>
+        <button class="btn-secondary" onclick="document.getElementById('sales-from').value='';document.getElementById('sales-to').value='';loadSales()">Clear</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Item</th><th>Order #</th><th>Qty</th><th>Occasion</th></tr></thead>
+        <tbody id="sales-body"></tbody>
+      </table>
+    </div>
+
+    <!-- LOGS -->
+    <div id="panel-logs" class="panel">
+      <h2>Ingredient Logs</h2>
+      <div class="form-row" style="margin-bottom:12px;gap:8px">
+        <label>From <input type="date" id="logs-from"></label>
+        <label>To <input type="date" id="logs-to"></label>
+        <button class="btn-secondary" onclick="loadLogs()">Apply</button>
+        <button class="btn-secondary" onclick="document.getElementById('logs-from').value='';document.getElementById('logs-to').value='';loadLogs()">Clear</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Timestamp</th><th>Ingredient</th><th>Qty</th><th>Action</th></tr></thead>
+        <tbody id="logs-body"></tbody>
+      </table>
+    </div>
+
+    <!-- COMPLIANCE -->
+    <div id="panel-compliance" class="panel">
+      <h2>Compliance Records</h2>
+      <div class="sc"><h3>Log Inspection</h3>
+        <div class="fg">
+          <div><label>Status</label>
+            <select id="comp-status"><option value="0">Waiting</option><option value="1">Passed</option><option value="2">Failed</option></select>
+          </div>
+          <div><label>Description</label><input id="comp-desc"></div>
+        </div>
+        <button class="btn-g" onclick="logCompliance()">Log</button>
+      </div>
+      <div class="form-row" style="margin:12px 0;gap:8px">
+        <label>From <input type="date" id="comp-from"></label>
+        <label>To <input type="date" id="comp-to"></label>
+        <button class="btn-secondary" onclick="loadCompliance()">Apply</button>
+        <button class="btn-secondary" onclick="document.getElementById('comp-from').value='';document.getElementById('comp-to').value='';loadCompliance()">Clear</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Date</th><th>Status</th><th>Description</th></tr></thead>
+        <tbody id="comp-body"></tbody>
+      </table>
+    </div>
+
+    <!-- CATEGORIES -->
+    <div id="panel-categories" class="panel">
+      <h2>Categories</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Auto-created when adding menu items.</p>
+      <table>
+        <thead><tr><th>#</th><th>Name</th></tr></thead>
+        <tbody id="cat-body"></tbody>
+      </table>
+    </div>
+
+    <div id="panel-giftcodes" class="panel">
+      <h2>Gift Codes</h2>
+      <div class="form-row" style="margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <input id="gc-code" placeholder="Code (e.g. SUMMER10)">
+        <input id="gc-amount" type="number" step="0.01" placeholder="Amount">
+        <select id="gc-type"><option value="0">Percent</option><option value="1">Flat</option></select>
+        <input id="gc-min" type="number" step="0.01" placeholder="Min order" value="0">
+        <input id="gc-from" type="datetime-local">
+        <input id="gc-to"   type="datetime-local">
+        <button class="btn-primary" id="gc-add">Add</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Code</th><th>Amount</th><th>Type</th><th>Min order</th><th>Valid from</th><th>Valid to</th><th></th></tr></thead>
+        <tbody id="gc-body"></tbody>
+      </table>
+    </div>
+
+    <div id="panel-forecast" class="panel">
+      <h2>Demand Forecast</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+        SQL heuristic over the last 90 days of sales, adjusted by
+        occasion and weather. Pick a target date, compute, review,
+        then apply &mdash; <em>apply</em> overwrites
+        <code>Ingredients.min_stock</code> and <code>Items.price</code>.
+      </p>
+      <div class="form-row" style="margin-bottom:16px">
+        <label>Target date <input type="date" id="fc-date"></label>
+        <label>Safety factor <input type="number" step="0.05" value="1.5" id="fc-safety" style="width:80px"></label>
+        <button class="btn-primary" id="fc-run">Compute</button>
+        <button class="btn-secondary" id="fc-apply-stocks">Apply min_stocks</button>
+        <button class="btn-secondary" id="fc-apply-prices">Apply prices</button>
+      </div>
+      <h3 style="margin-top:20px">Predicted min_stocks</h3>
+      <table>
+        <thead><tr><th>Ingredient</th><th>Unit</th><th>Current</th><th>Predicted</th><th>Applied</th><th>Generated</th></tr></thead>
+        <tbody id="fc-stocks-body"><tr><td colspan="6" class="empty">No forecast yet for this date.</td></tr></tbody>
+      </table>
+      <h3 style="margin-top:24px">Price suggestions</h3>
+      <table>
+        <thead><tr><th>Item</th><th>Current price</th><th>Suggested</th><th>Reason</th><th>Applied</th><th>Generated</th></tr></thead>
+        <tbody id="fc-prices-body"><tr><td colspan="6" class="empty">No forecast yet for this date.</td></tr></tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = (window.SMARTPLATE_API || 'http://localhost:8000') + '/api/v1';
+let token = '', allMenu = [], allIng = [], allBatches = [], allAllergens = [];
+const UNITS = ['kg','g','litre','ml','units','tbsp','tsp'];
+
+function ah(){ return {headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}} }
+
+(function(){
+  token = sessionStorage.getItem('sp_token') || '';
+  const role = sessionStorage.getItem('sp_role') || '';
+  if(!token || role !== 'manager'){ window.location.href='index.html'; return; }
+  document.getElementById('auth-guard').style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+  loadAllergens().then(loadOverview);
+  // Show supplier fields when role is supplier
+  document.getElementById('u-role').addEventListener('change', function(){
+    document.getElementById('u-supplier-fields').style.display = this.value === 'supplier' ? 'block' : 'none';
+  });
+})();
+
+function logout(){ sessionStorage.clear(); window.location.href='index.html'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function show(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  const nav = Array.from(document.querySelectorAll('.nav-item'))
+    .find(n => (n.getAttribute('onclick')||'').includes(`'${name}'`));
+  if(nav) nav.classList.add('active');
+  const loaders = {overview:loadOverview,menu:loadMenu,ingredients:loadIngredients,batches:loadBatches,waste:()=>{loadWasteBatches();loadWaste();},suppliers:loadSuppliers,users:loadUsers,orders:loadOrders,sales:loadSales,logs:loadLogs,compliance:loadCompliance,categories:loadCategories,giftcodes:initGiftCodes,forecast:initForecast};
+  if(loaders[name]) loaders[name]();
+}
+
+// ── GIFT CODES ────────────────────────────────────────────────────────────────
+function initGiftCodes(){
+  document.getElementById('gc-add').onclick = addGiftCode;
+  loadGiftCodes();
+}
+async function loadGiftCodes(){
+  const res = await fetch(API+'/manager/gift-codes', ah());
+  const rows = res.ok ? (await res.json()) : [];
+  const tLabel = ['Percent','Flat'];
+  document.getElementById('gc-body').innerHTML = rows.length
+    ? rows.map(g=>`<tr><td>${g.gift_code_id}</td><td>${esc(g.code)}</td><td>${g.amount}</td><td>${tLabel[g.type]||g.type}</td><td>${g.min_order}</td><td>${esc(g.valid_from||'')}</td><td>${esc(g.valid_to||'')}</td><td><button class="btn-secondary" data-del-gc="${g.gift_code_id}">Delete</button></td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No gift codes.</td></tr>';
+  document.querySelectorAll('[data-del-gc]').forEach(b=>b.addEventListener('click',async e=>{
+    const id=e.currentTarget.getAttribute('data-del-gc');
+    if(!confirm('Delete gift code?')) return;
+    const r = await fetch(API+'/manager/gift-codes/'+id,{method:'DELETE',...ah()});
+    if(!r.ok){const d=await r.json();return alert(d.detail||'error');}
+    loadGiftCodes();
+  }));
+}
+async function addGiftCode(){
+  const body = {
+    code: document.getElementById('gc-code').value.trim(),
+    amount: parseFloat(document.getElementById('gc-amount').value)||0,
+    type: parseInt(document.getElementById('gc-type').value,10),
+    min_order: parseFloat(document.getElementById('gc-min').value)||0,
+    valid_from: (document.getElementById('gc-from').value||'').replace('T',' '),
+    valid_to:   (document.getElementById('gc-to').value||'').replace('T',' '),
+  };
+  if(!body.code || !body.valid_from || !body.valid_to){ alert('Code, from and to are required'); return; }
+  const r = await fetch(API+'/manager/gift-codes',{method:'POST',...ah(),body:JSON.stringify(body)});
+  if(!r.ok){const d=await r.json();return alert(d.detail||'error');}
+  ['gc-code','gc-amount','gc-min','gc-from','gc-to'].forEach(i=>document.getElementById(i).value='');
+  loadGiftCodes();
+}
+
+// ── FORECAST ──────────────────────────────────────────────────────────────────
+function initForecast(){
+  const dp = document.getElementById('fc-date');
+  if(!dp.value){
+    const t = new Date(); t.setDate(t.getDate()+1);
+    dp.value = t.toISOString().slice(0,10);
+  }
+  document.getElementById('fc-run').onclick = runForecast;
+  document.getElementById('fc-apply-stocks').onclick = ()=>applyForecast('minstocks');
+  document.getElementById('fc-apply-prices').onclick = ()=>applyForecast('pricing');
+  loadForecast();
+}
+async function runForecast(){
+  const target = document.getElementById('fc-date').value;
+  const safety = parseFloat(document.getElementById('fc-safety').value)||1.5;
+  if(!target){ alert('Pick a target date'); return; }
+  const body = JSON.stringify({target_date:target, safety});
+  const [r1,r2] = await Promise.all([
+    fetch(API+'/manager/forecast/minstocks/run',{method:'POST',...ah(),body}),
+    fetch(API+'/manager/forecast/pricing/run',  {method:'POST',...ah(),body}),
+  ]);
+  if(!r1.ok){const d=await r1.json();return alert('min_stock: '+(d.detail||'error'));}
+  if(!r2.ok){const d=await r2.json();return alert('pricing: '+(d.detail||'error'));}
+  loadForecast();
+}
+async function applyForecast(kind){
+  const target = document.getElementById('fc-date').value;
+  if(!target){ alert('Pick a target date'); return; }
+  if(!confirm(`Apply ${kind} for ${target}? This overwrites current values.`)) return;
+  const r = await fetch(API+'/manager/forecast/'+kind+'/apply',{method:'POST',...ah(),body:JSON.stringify({target_date:target})});
+  if(!r.ok){const d=await r.json();return alert(d.detail||'error');}
+  loadForecast();
+}
+async function loadForecast(){
+  const target = document.getElementById('fc-date').value;
+  if(!target) return;
+  const [stocks, prices] = await Promise.all([
+    fetch(API+'/manager/forecast/minstocks?target_date='+encodeURIComponent(target),ah()).then(r=>r.ok?r.json():[]),
+    fetch(API+'/manager/forecast/pricing?target_date='+encodeURIComponent(target),ah()).then(r=>r.ok?r.json():[]),
+  ]);
+  const sb = document.getElementById('fc-stocks-body');
+  sb.innerHTML = stocks.length
+    ? stocks.map(s=>`<tr><td>${esc(s.ingredient_name)}</td><td>${esc(s.unit||'')}</td><td>${s.current_min_stock}</td><td>${s.predicted_min_stock}</td><td>${s.applied?'Yes':'No'}</td><td>${esc(s.generated_at||'')}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No forecast yet for this date.</td></tr>';
+  const pb = document.getElementById('fc-prices-body');
+  pb.innerHTML = prices.length
+    ? prices.map(p=>`<tr><td>${esc(p.item_name)}</td><td>$${parseFloat(p.current_price||0).toFixed(2)}</td><td>$${parseFloat(p.suggested_price||0).toFixed(2)}</td><td>${esc(p.reason||'')}</td><td>${p.applied?'Yes':'No'}</td><td>${esc(p.generated_at||'')}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No forecast yet for this date.</td></tr>';
+}
+
+async function loadAllergens(){
+  const res = await fetch(API+'/manager/allergens', ah());
+  allAllergens = (await res.json()) || [];
+  const sel = document.getElementById('ing-allergen-sel');
+  if(sel) sel.innerHTML = allAllergens.map(a=>`<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────────────────────
+async function loadOverview(){
+  let [ings, batches, orders, waste] = await Promise.all([
+    fetch(API+'/manager/ingredients',ah()).then(r=>r.json()),
+    fetch(API+'/manager/batches',ah()).then(r=>r.json()),
+    fetch(API+'/manager/orders',ah()).then(r=>r.json()),
+    fetch(API+'/manager/waste',ah()).then(r=>r.json()),
+  ]);
+  ings=ings||[]; batches=batches||[]; orders=orders||[]; waste=waste||[];
+  const low = ings.filter(i=>i.quantity<=i.min_stock);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="val">${ings.length}</div><div class="lbl">Ingredients</div></div>
+    <div class="stat"><div class="val">${batches.length}</div><div class="lbl">Batches</div></div>
+    <div class="stat"><div class="val">${orders.length}</div><div class="lbl">Total Orders</div></div>
+    <div class="stat"><div class="val" style="color:var(--red)">${low.length}</div><div class="lbl">Low Stock</div></div>
+    <div class="stat"><div class="val">${waste.length}</div><div class="lbl">Waste Records</div></div>`;
+  document.getElementById('recent-orders').innerHTML = orders.slice(0,5).map(o=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span>#${o.order_id} — User ${o.user_id}</span>
+      <span style="color:var(--accent)">$${parseFloat(o.price||0).toFixed(2)}</span>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:12px">No orders yet</p>';
+  document.getElementById('low-stock').innerHTML = low.map(i=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span>${esc(i.name)}</span>
+      <span style="color:var(--red)">${i.quantity} / ${i.min_stock} ${esc(i.unit)}</span>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:12px">All stocked ✓</p>';
+}
+
+// ── MENU ──────────────────────────────────────────────────────────────────────
+async function loadMenu(){
+  const res = await fetch(API+'/manager/menu',ah());
+  allMenu = (await res.json()) || [];
+  renderMenu(allMenu);
+}
+function filterMenu(){
+  const q = document.getElementById('menu-search').value.toLowerCase();
+  renderMenu(allMenu.filter(i=>i.name.toLowerCase().includes(q)||(i.category_name||'').toLowerCase().includes(q)));
+}
+function renderMenu(items){
+  const tb = document.getElementById('menu-body');
+  tb.innerHTML = items.map(i=>`<tr>
+    <td>${i.item_id}</td>
+    <td><input class="ed" id="mn-${i.item_id}" value="${esc(i.name)}" style="width:140px"></td>
+    <td>${esc(i.category_name||'')}</td>
+    <td><input class="ed" id="mp-${i.item_id}" type="number" step="0.01" value="${i.price}" style="width:72px"></td>
+    <td><input class="ed" id="mpt-${i.item_id}" type="number" value="${i.prep_time}" style="width:58px"></td>
+    <td><select class="ed" id="ma-${i.item_id}" style="width:80px">
+      <option value="1" ${i.is_active?'selected':''}>Yes</option>
+      <option value="0" ${!i.is_active?'selected':''}>No</option>
+    </select></td>
+    <td class="actions">
+      <button class="btn-g" onclick="saveMenuItem(${i.item_id})">Save</button>
+      <button class="btn-b" data-recipe="${i.item_id}">Recipe</button>
+      <button class="btn-r" onclick="deleteMenuItem(${i.item_id})">Del</button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan=7 class="empty">No menu items</td></tr>';
+  tb.querySelectorAll('[data-recipe]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id = parseInt(btn.dataset.recipe);
+      const item = items.find(x=>x.item_id===id);
+      if(item) viewRecipe(id, item.name);
+    });
+  });
+}
+async function addMenuItem(){
+  const res = await fetch(API+'/manager/menu',{method:'POST',...ah(),body:JSON.stringify({name:document.getElementById('mi-name').value,description:document.getElementById('mi-desc').value,price:parseFloat(document.getElementById('mi-price').value),prep_time:parseInt(document.getElementById('mi-prep').value),category:document.getElementById('mi-cat').value})});
+  if(res.ok){ ['mi-name','mi-desc','mi-price','mi-prep','mi-cat'].forEach(id=>document.getElementById(id).value=''); loadMenu(); }
+  else{ const d=await res.json(); alert(d.detail||d.error); }
+}
+async function saveMenuItem(id){
+  await fetch(API+'/manager/menu/'+id,{method:'PATCH',...ah(),body:JSON.stringify({name:document.getElementById('mn-'+id).value,price:parseFloat(document.getElementById('mp-'+id).value),prep_time:parseInt(document.getElementById('mpt-'+id).value),is_active:parseInt(document.getElementById('ma-'+id).value)})});
+  loadMenu();
+}
+async function deleteMenuItem(id){ if(!confirm('Delete menu item?')) return; await fetch(API+'/manager/menu/'+id,{method:'DELETE',...ah()}); loadMenu(); }
+async function viewRecipe(itemId, name){
+  const [rRes, iRes] = await Promise.all([fetch(API+'/manager/menu/'+itemId+'/recipe',ah()), fetch(API+'/manager/ingredients',ah())]);
+  const recipe = (await rRes.json()) || [];
+  const ings   = (await iRes.json()) || [];
+  const ingOpts = ings.map(i=>`<option value="${i.ingredient_id}">${esc(i.name)} (${esc(i.unit)})</option>`).join('');
+  const unitOpts = ['kg','g','litre','ml','units','tbsp','tsp'].map(u=>`<option>${u}</option>`).join('');
+  const rows = recipe.map(r=>`<tr>
+    <td>${esc(r.ingredient_name||r.ingredient_id)}</td><td>${r.quantity} ${esc(r.unit)}</td>
+    <td><button onclick="delRL(${itemId},${r.ingredient_id},this)" style="padding:4px 8px;font-size:11px;background:var(--red);color:#fff;border:none;border-radius:5px;cursor:pointer">Remove</button></td>
+  </tr>`).join('');
+  const S = `<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',sans-serif;background:#0a0c12;color:#e8eaf0;padding:24px;min-height:100vh}h2{font-size:17px;margin-bottom:16px;color:#56d18a}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px}th{text-align:left;padding:8px;border-bottom:1px solid #252838;color:#636880;font-size:11px}td{padding:8px;border-bottom:1px solid #1a1d2a}h3{font-size:13px;margin-bottom:10px;color:#636880}select,input{padding:7px 10px;background:#13161f;border:1px solid #252838;color:#e8eaf0;border-radius:6px;font-size:13px;margin-right:6px;margin-bottom:8px}button.add{padding:7px 14px;background:#56d18a;color:#111;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px}</style>`;
+  const win = window.open('','_blank','width=520,height=520');
+  win.document.write(`<!DOCTYPE html><html><head>${S}</head><body>
+    <h2>Recipe: ${esc(name)}</h2>
+    <table><thead><tr><th>Ingredient</th><th>Qty</th><th></th></tr></thead><tbody id="rrows">${rows}</tbody></table>
+    <h3>Add ingredient</h3>
+    <select id="r-ing">${ingOpts}</select>
+    <input id="r-qty" type="number" step="0.01" placeholder="Qty" style="width:80px">
+    <select id="r-unit">${unitOpts}</select>
+    <button class="add" onclick="addRL(${itemId})">Add</button>
+  </body></html>`);
+  win.addRL = async function(iid){
+    const ingId=parseInt(win.document.getElementById('r-ing').value);
+    const qty=parseFloat(win.document.getElementById('r-qty').value);
+    const unit=win.document.getElementById('r-unit').value;
+    if(!qty){ alert('Enter quantity'); return; }
+    await fetch(API+'/manager/menu/'+iid+'/recipe',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ingredient_id:ingId,quantity:qty,unit})});
+    win.close(); viewRecipe(iid,name);
+  };
+  win.delRL = async function(iid,ingId,btn){
+    await fetch(API+'/manager/menu/'+iid+'/recipe/'+ingId,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});
+    btn.closest('tr').remove();
+  };
+}
+
+// ── INGREDIENTS ───────────────────────────────────────────────────────────────
+async function loadIngredients(){
+  const res = await fetch(API+'/manager/ingredients',ah());
+  allIng = (await res.json()) || [];
+  document.getElementById('ing-body').innerHTML = allIng.map(i=>{
+    const isLow = parseFloat(i.quantity) <= parseFloat(i.min_stock);
+    const unitOpts = UNITS.map(u=>`<option value="${u}" ${i.unit===u?'selected':''}>${u}</option>`).join('');
+    return `<tr>
+      <td>${i.ingredient_id}</td>
+      <td><input class="ed" id="in-${i.ingredient_id}" value="${esc(i.name)}" style="width:130px"></td>
+      <td><select class="ed" id="iu-${i.ingredient_id}" style="width:80px">${unitOpts}</select></td>
+      <td><input class="ed" id="im-${i.ingredient_id}" type="number" step="0.01" value="${i.min_stock}" style="width:75px"></td>
+      <td style="color:${isLow?'var(--red)':'var(--accent)'};font-weight:600">${i.quantity} ${esc(i.unit)}</td>
+      <td>${esc(i.allergen_name||i.allergen_id||'—')}</td>
+      <td><span class="badge ${isLow?'bR':'bG'}">${isLow?'⚠ Low':'✓ OK'}</span></td>
+      <td class="actions">
+        <button class="btn-g" onclick="saveIngredient(${i.ingredient_id})">Save</button>
+        <button class="btn-r" onclick="deleteIngredient(${i.ingredient_id})">Del</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan=8 class="empty">No ingredients</td></tr>';
+}
+async function addIngredient(){
+  const name = document.getElementById('ing-name').value.trim();
+  if(!name){ alert('Name required'); return; }
+  const res = await fetch(API+'/manager/ingredients',{method:'POST',...ah(),body:JSON.stringify({name,unit:document.getElementById('ing-unit').value,min_stock:parseFloat(document.getElementById('ing-min').value)||0,allergen:document.getElementById('ing-allergen-sel').value||'None'})});
+  if(res.ok){ document.getElementById('ing-name').value=''; document.getElementById('ing-min').value=''; loadIngredients(); }
+  else{ const d=await res.json(); alert(d.detail||d.error); }
+}
+async function saveIngredient(id){
+  await fetch(API+'/manager/ingredients/'+id,{method:'PATCH',...ah(),body:JSON.stringify({name:document.getElementById('in-'+id).value,unit:document.getElementById('iu-'+id).value,min_stock:parseFloat(document.getElementById('im-'+id).value)})});
+  loadIngredients();
+}
+async function deleteIngredient(id){ if(!confirm('Delete ingredient? This also removes its recipes.')) return; await fetch(API+'/manager/ingredients/'+id,{method:'DELETE',...ah()}); loadIngredients(); }
+
+// ── BATCHES ───────────────────────────────────────────────────────────────────
+async function loadBatches(){
+  const res = await fetch(API+'/manager/batches',ah());
+  allBatches = (await res.json()) || [];
+  renderBatches(allBatches);
+}
+function renderBatches(batches){
+  const sLabel = ['Ordered','Shipped','Delivered'];
+  document.getElementById('batches-body').innerHTML = batches.map(b=>{
+    const unitOpts = UNITS.map(u=>`<option value="${u}" ${(b.unit||'')=== u?'selected':''}>${u}</option>`).join('');
+    return `<tr>
+      <td>${b.batch_id}</td>
+      <td>${esc(b.ingredient_name||b.ingredient_id)}</td>
+      <td>${esc(b.supplier_name||'#'+b.supplier_id)}</td>
+      <td>${new Date(b.purchase_date).toLocaleDateString()}</td>
+      <td><input class="ed" id="bexp-${b.batch_id}" type="date" value="${b.expiry_date?b.expiry_date.substring(0,10):''}" style="width:128px"></td>
+      <td><input class="ed" id="bqty-${b.batch_id}" type="number" step="0.01" value="${b.quantity}" style="width:68px"></td>
+      <td><select class="ed" id="bunit-${b.batch_id}" style="width:75px">${unitOpts}</select></td>
+      <td><input class="ed" id="bcost-${b.batch_id}" type="number" step="0.01" value="${b.cost||0}" style="width:75px"></td>
+      <td><select class="ed" id="bst-${b.batch_id}" style="width:95px">
+        <option value="0" ${b.status===0?'selected':''}>Ordered</option>
+        <option value="1" ${b.status===1?'selected':''}>Shipped</option>
+        <option value="2" ${b.status===2?'selected':''}>Delivered</option>
+      </select></td>
+      <td class="actions">
+        <button class="btn-g" onclick="saveBatch(${b.batch_id})">Save</button>
+        <button class="btn-r" onclick="deleteBatch(${b.batch_id})">Del</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan=10 class="empty">No batches</td></tr>';
+}
+async function saveBatch(id){
+  const body={quantity:parseFloat(document.getElementById('bqty-'+id).value),unit:document.getElementById('bunit-'+id).value,cost:parseFloat(document.getElementById('bcost-'+id).value),status:parseInt(document.getElementById('bst-'+id).value)};
+  const exp = document.getElementById('bexp-'+id).value;
+  if(exp) body.expiry_date = exp;
+  const res = await fetch(API+'/manager/batches/'+id,{method:'PATCH',...ah(),body:JSON.stringify(body)});
+  if(!res.ok){ const d=await res.json(); alert(d.detail||d.error); }
+  loadBatches();
+}
+async function deleteBatch(id){ if(!confirm('Delete this batch?')) return; await fetch(API+'/manager/batches/'+id,{method:'DELETE',...ah()}); loadBatches(); }
+
+// ── WASTE ─────────────────────────────────────────────────────────────────────
+async function loadWasteBatches(){
+  const res = await fetch(API+'/manager/batches',ah());
+  const batches = (await res.json()) || [];
+  const delivered = batches.filter(b=>b.status===2 && b.quantity>0);
+  const sel = document.getElementById('w-batch-sel');
+  sel.innerHTML = '<option value="">— select batch —</option>' +
+    delivered.map(b=>`<option value="${b.batch_id}">#${b.batch_id} — ${esc(b.ingredient_name||b.ingredient_id)} (${b.quantity} ${esc(b.unit||'')})</option>`).join('');
+  sel.onchange = function(){
+    const b = delivered.find(x=>x.batch_id===parseInt(this.value));
+    document.getElementById('w-batch-info').textContent = b ? `Available: ${b.quantity} ${b.unit||''} · Ingredient: ${b.ingredient_name||b.ingredient_id}` : '';
+  };
+}
+async function loadWaste(){
+  const res = await fetch(API+'/manager/waste',ah());
+  const w = (await res.json()) || [];
+  document.getElementById('waste-body').innerHTML = w.map(r=>`<tr>
+    <td>${r.waste_record_id}</td>
+    <td>#${r.batch_id}</td>
+    <td>${esc(r.ingredient_name||'—')}</td>
+    <td>${r.quantity}</td>
+    <td>${new Date(r.timestamp).toLocaleString()}</td>
+  </tr>`).join('') || '<tr><td colspan=5 class="empty">No waste records</td></tr>';
+}
+async function logWaste(){
+  const batchId = parseInt(document.getElementById('w-batch-sel').value);
+  const qty = parseFloat(document.getElementById('w-qty').value);
+  if(!batchId){ alert('Select a batch'); return; }
+  if(!qty || qty <= 0){ alert('Enter a valid quantity'); return; }
+  const res = await fetch(API+'/manager/waste',{method:'POST',...ah(),body:JSON.stringify({batch_id:batchId,quantity:qty})});
+  if(res.ok){ document.getElementById('w-qty').value=''; loadWasteBatches(); loadWaste(); }
+  else{ const d=await res.json(); alert(d.detail||d.error); }
+}
+
+// ── SUPPLIERS ─────────────────────────────────────────────────────────────────
+async function loadSuppliers(){
+  const res = await fetch(API+'/manager/suppliers',ah());
+  const sups = (await res.json()) || [];
+  document.getElementById('sup-body').innerHTML = sups.map(s=>`<tr>
+    <td>${s.supplier_id}</td>
+    <td><input class="ed" id="sn-${s.supplier_id}" value="${esc(s.name)}" style="width:130px"></td>
+    <td><input class="ed" id="sc-${s.supplier_id}" value="${esc(s.contact||'')}" style="width:160px"></td>
+    <td><input class="ed" id="sd-${s.supplier_id}" type="number" value="${s.delivery_time}" style="width:58px"></td>
+    <td><select class="ed" id="sa-${s.supplier_id}" style="width:68px">
+      <option value="1" ${s.is_active?'selected':''}>Yes</option>
+      <option value="0" ${!s.is_active?'selected':''}>No</option>
+    </select></td>
+    <td>${s.user_id||'—'}</td>
+    <td class="actions">
+      <button class="btn-g" onclick="saveSupplier(${s.supplier_id})">Save</button>
+      <button class="btn-r" onclick="deleteSupplier(${s.supplier_id})">Del</button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan=7 class="empty">No suppliers</td></tr>';
+}
+async function addSupplierWithUser(){
+  const username = document.getElementById('sup-username').value.trim();
+  const email    = document.getElementById('sup-contact').value.trim();
+  const password = document.getElementById('sup-password').value;
+  const name     = document.getElementById('sup-name').value.trim();
+  const dt       = parseInt(document.getElementById('sup-dt').value) || 2;
+  if(!username||!email||!password||!name){ alert('All fields required'); return; }
+  // Creates user with supplier role + Suppliers row atomically via procedure
+  const res = await fetch(API+'/manager/users',{method:'POST',...ah(),body:JSON.stringify({username,email,password,role_name:'supplier',user_type:'supplier',name,salary:0,contact:email,delivery_time:dt})});
+  if(res.ok){ ['sup-username','sup-contact','sup-password','sup-name'].forEach(id=>document.getElementById(id).value=''); loadSuppliers(); }
+  else{ const d=await res.json(); alert(d.detail||d.error); }
+}
+async function saveSupplier(id){
+  await fetch(API+'/manager/suppliers/'+id,{method:'PATCH',...ah(),body:JSON.stringify({name:document.getElementById('sn-'+id).value,contact:document.getElementById('sc-'+id).value,delivery_time:parseInt(document.getElementById('sd-'+id).value),is_active:parseInt(document.getElementById('sa-'+id).value)})});
+  loadSuppliers();
+}
+async function deleteSupplier(id){ if(!confirm('Delete supplier?')) return; await fetch(API+'/manager/suppliers/'+id,{method:'DELETE',...ah()}); loadSuppliers(); }
+
+// ── USERS ─────────────────────────────────────────────────────────────────────
+async function loadUsers(){
+  const res = await fetch(API+'/manager/users',ah());
+  const users = (await res.json()) || [];
+  const roleColors = {manager:'bP',chef:'bY',employee:'bB',supplier:'bG',customer:'bR'};
+  document.getElementById('users-body').innerHTML = users.map(u=>`<tr>
+    <td>${u.user_id}</td>
+    <td>${esc(u.username)}</td>
+    <td>${esc(u.email)}</td>
+    <td><span class="badge ${roleColors[u.role_name]||'bP'}">${esc(u.role_name)}</span></td>
+    <td>${new Date(u.last_login).toLocaleDateString()}</td>
+    <td><button class="btn-r" onclick="deleteUser(${u.user_id})">Delete</button></td>
+  </tr>`).join('') || '<tr><td colspan=6 class="empty">No users</td></tr>';
+}
+async function createUser(){
+  const role = document.getElementById('u-role').value;
+  const userType = role === 'chef' ? 'chef' : role === 'manager' ? 'employee' : role;
+  const body = {
+    username: document.getElementById('u-username').value.trim(),
+    email:    document.getElementById('u-email').value.trim(),
+    password: document.getElementById('u-password').value,
+    role_name: role,
+    user_type: userType,
+    name:     document.getElementById('u-name').value.trim(),
+    salary:   parseFloat(document.getElementById('u-salary').value)||0,
+    contact:  document.getElementById('u-contact').value.trim(),
+    delivery_time: parseInt(document.getElementById('u-dt').value)||2,
+  };
+  if(!body.username||!body.email||!body.password){ alert('Username, email and password required'); return; }
+  const res = await fetch(API+'/manager/users',{method:'POST',...ah(),body:JSON.stringify(body)});
+  const msg = document.getElementById('u-result');
+  if(res.ok){
+    msg.style.color='var(--accent)'; msg.textContent='✓ User created';
+    ['u-username','u-email','u-password','u-name','u-salary','u-contact'].forEach(id=>document.getElementById(id).value='');
+    loadUsers();
+  } else {
+    const d=await res.json(); msg.style.color='var(--red)'; msg.textContent=d.detail||d.error||'Error';
+  }
+}
+async function deleteUser(id){ if(!confirm('Delete user? Cannot be undone.')) return; await fetch(API+'/manager/users/'+id,{method:'DELETE',...ah()}); loadUsers(); }
+
+// ── ORDERS ────────────────────────────────────────────────────────────────────
+function _qs(pairs){
+  const q = Object.entries(pairs).filter(([,v])=>v!==''&&v!=null).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+  return q ? '?'+q : '';
+}
+async function loadOrders(){
+  const qs = _qs({from_date:document.getElementById('orders-from')?.value,to_date:document.getElementById('orders-to')?.value});
+  const res = await fetch(API+'/manager/orders'+qs,ah());
+  const orders = (await res.json()) || [];
+  document.getElementById('orders-body').innerHTML = orders.map(o=>`<tr>
+    <td>#${o.order_id}</td>
+    <td>${o.user_id}</td>
+    <td>${new Date(o.order_time).toLocaleString()}</td>
+    <td style="color:var(--accent);font-weight:600">$${parseFloat(o.price||0).toFixed(2)}</td>
+    <td><button class="btn-b" onclick="viewOrderItems(${o.order_id})" style="padding:4px 9px;font-size:11px">Items</button></td>
+  </tr>`).join('') || '<tr><td colspan=5 class="empty">No orders</td></tr>';
+}
+async function viewOrderItems(orderId){
+  const res = await fetch(API+'/manager/orders/'+orderId,ah());
+  const data = await res.json();
+  const items = (data.items||[]);
+  const sLabel=['Preparing','Out for Delivery','Delivered'];
+  alert('Order #'+orderId+':\n'+items.map(it=>`${it.item_name||it.item_id} x${it.quantity} — ${sLabel[it.status]||it.status}`).join('\n'));
+}
+
+// ── SALES ─────────────────────────────────────────────────────────────────────
+async function loadSales(){
+  const qs = _qs({from_date:document.getElementById('sales-from')?.value,to_date:document.getElementById('sales-to')?.value});
+  const res = await fetch(API+'/manager/sales'+qs,ah());
+  const sales = (await res.json()) || [];
+  document.getElementById('sales-body').innerHTML = sales.map(s=>`<tr>
+    <td>${s.sales_history_id}</td>
+    <td>${esc(s.item_name||s.item_id)}</td>
+    <td>#${s.menu_order_id}</td>
+    <td>${s.quantity}</td>
+    <td>${esc(s.occasion_name||s.occasion_id)}</td>
+  </tr>`).join('') || '<tr><td colspan=5 class="empty">No sales history</td></tr>';
+}
+
+// ── LOGS ──────────────────────────────────────────────────────────────────────
+async function loadLogs(){
+  const qs = _qs({from_date:document.getElementById('logs-from')?.value,to_date:document.getElementById('logs-to')?.value});
+  const [logRes, ingRes] = await Promise.all([
+    fetch(API+'/manager/logs'+qs,ah()),
+    fetch(API+'/manager/ingredients',ah()),
+  ]);
+  const logs = (await logRes.json()) || [];
+  const ings = (await ingRes.json()) || [];
+  const ingMap = {};
+  ings.forEach(i=>{ ingMap[i.ingredient_id]=i.name; });
+  const actions = ['In storage','Used','Expired'];
+  const colors  = ['bG','bY','bR'];
+  document.getElementById('logs-body').innerHTML = logs.map(l=>`<tr>
+    <td>${l.log_id}</td>
+    <td>${new Date(l.timestamp).toLocaleString()}</td>
+    <td>${esc(ingMap[l.ingredient_id]||'#'+l.ingredient_id)}</td>
+    <td>${l.quantity}</td>
+    <td><span class="badge ${colors[l.status]||''}">${actions[l.status]||l.status}</span></td>
+  </tr>`).join('') || '<tr><td colspan=5 class="empty">No logs</td></tr>';
+}
+
+// ── COMPLIANCE ────────────────────────────────────────────────────────────────
+async function loadCompliance(){
+  const qs = _qs({from_date:document.getElementById('comp-from')?.value,to_date:document.getElementById('comp-to')?.value});
+  const res = await fetch(API+'/manager/compliance'+qs,ah());
+  const recs = (await res.json()) || [];
+  const sLabel=['Waiting','Passed','Failed'];
+  const sCls  =['bY','bG','bR'];
+  document.getElementById('comp-body').innerHTML = recs.map(r=>`<tr>
+    <td>${r.id}</td>
+    <td>${r.inspection_date}</td>
+    <td><span class="badge ${sCls[r.status]||''}">${sLabel[r.status]||r.status}</span></td>
+    <td>${esc(r.description||'')}</td>
+  </tr>`).join('') || '<tr><td colspan=4 class="empty">No compliance records</td></tr>';
+}
+async function logCompliance(){
+  const res = await fetch(API+'/manager/compliance',{method:'POST',...ah(),body:JSON.stringify({status:parseInt(document.getElementById('comp-status').value),description:document.getElementById('comp-desc').value})});
+  if(res.ok){ document.getElementById('comp-desc').value=''; loadCompliance(); }
+}
+
+// ── CATEGORIES ────────────────────────────────────────────────────────────────
+async function loadCategories(){
+  const res = await fetch(API+'/manager/categories',ah());
+  const cats = (await res.json()) || [];
+  document.getElementById('cat-body').innerHTML = cats.map(c=>`<tr><td>${c.id}</td><td>${esc(c.name)}</td></tr>`).join('') || '<tr><td colspan=2 class="empty">No categories</td></tr>';
+}
+</script>
+</body>
+</html>
