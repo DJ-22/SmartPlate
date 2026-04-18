@@ -192,7 +192,7 @@ async function removeSupply(ingId){
 }
 
 async function loadAllIngredients(){
-  const res=await fetch(API+'/employee/ingredients',ah());
+  const res=await fetch(API+'/supplier/ingredients',ah());
   const ings=(await res.json())||[];
   const sel=document.getElementById('new-ing');
   sel.innerHTML=ings.map(i=>`<option value="${i.ingredient_id}">${esc(i.name)}</option>`).join('');
