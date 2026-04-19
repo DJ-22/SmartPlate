@@ -269,18 +269,35 @@ def list_menu(user=Depends(require_role("customer"))):
     return query(
         "SELECT i.*, c.name AS category_name FROM Items i "
         "JOIN Category c ON i.category_id=c.category_id "
-        "WHERE i.is_active=1 ORDER BY c.name, i.name"
+        "WHERE i.is_active=1 "
+        "AND EXISTS (SELECT 1 FROM Recipes r WHERE r.item_id=i.item_id) "
+        "ORDER BY c.name, i.name"
     )
 
 @app.get("/api/v1/user/orders")
 def list_my_orders(user=Depends(require_role("customer"))):
+    # Hide orders that have no items (empty shells from abandoned sessions)
     return query(
-        "SELECT * FROM Menu_Orders WHERE user_id=%s ORDER BY order_time DESC",
+        "SELECT mo.* FROM Menu_Orders mo "
+        "WHERE mo.user_id=%s AND EXISTS ("
+        "  SELECT 1 FROM Menu_Orders_Items oi WHERE oi.menu_order_id = mo.menu_order_id"
+        ") ORDER BY mo.order_time DESC",
         (user["user_id"],)
     )
 
 @app.post("/api/v1/user/orders", status_code=201)
 def place_order(user=Depends(require_role("customer"))):
+    # Reuse an existing empty order for this user rather than stacking empties
+    existing = query_one(
+        "SELECT mo.menu_order_id FROM Menu_Orders mo "
+        "WHERE mo.user_id=%s AND NOT EXISTS ("
+        "  SELECT 1 FROM Menu_Orders_Items oi WHERE oi.menu_order_id = mo.menu_order_id"
+        ") ORDER BY mo.order_time DESC LIMIT 1",
+        (user["user_id"],)
+    )
+    if existing:
+        return {"order_id": existing["menu_order_id"]}
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.callproc("sp_PlaceOrder", (user["user_id"],))
@@ -435,6 +452,13 @@ def list_batches_emp(user=Depends(require_role("employee"))):
 
 # ── Supplier ──────────────────────────────────────────────────────────────────
 
+@app.get("/api/v1/supplier/ingredients")
+def list_ingredients_sup(user=Depends(require_role("supplier"))):
+    return query(
+        "SELECT i.*, a.name AS allergen_name FROM Ingredients i "
+        "LEFT JOIN Allergens a ON i.allergen_id=a.allergen_id ORDER BY i.name"
+    )
+
 @app.get("/api/v1/supplier/supplies")
 def get_my_supplies(user=Depends(require_role("supplier"))):
     return query(
@@ -473,7 +497,8 @@ def update_supply_pricing(ingredient_id: int, req: SupplyPricingReq,
 @app.get("/api/v1/supplier/batches")
 def get_my_batches(user=Depends(require_role("supplier"))):
     return query(
-        "SELECT ib.*, i.name AS ingredient_name FROM Inventory_Batches ib "
+        "SELECT ib.inventory_batch_id AS batch_id, ib.*, "
+        "i.name AS ingredient_name FROM Inventory_Batches ib "
         "LEFT JOIN Ingredients i ON ib.ingredient_id=i.ingredient_id "
         "WHERE ib.supplier_id=%s ORDER BY ib.status ASC, ib.purchase_date DESC",
         (user["supplier_id"],)
